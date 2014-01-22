@@ -14,7 +14,8 @@
   (available [rs]))
 
 (defprotocol FressianWriter
-  (writeNull! [fw]))
+  (writeNull! [fw])
+  (writeBoolean! [fw b]))
 
 (defprotocol FressianReader
   (readObject! [fr]))

@@ -1,0 +1,62 @@
+(ns longshi.fressian.ByteStream
+  (:require [longshi.fressian.protocols :as p]))
+
+(deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
+  p/WriteStream
+  (write! [bos b]
+    (let [new-count (inc cnt)]
+      (if (< (.-length stream) new-count)
+        (let [new-stream (js/Uint8Array. (max new-count (bit-shift-left cnt 1)))]
+          (.set new-stream stream)
+          (set! stream new-stream)))
+      (aset stream cnt b)
+      (set! cnt new-count)))
+  (writeBytes! [bos b off len]
+    (let [new-count (+ cnt len)]
+      (if (< (.-length stream) new-count)
+        (let [new-stream (js/Uint8Array. (max new-count (bit-shift-left cnt 1)))]
+          (.set new-stream stream)
+          (set! stream new-stream)))
+      (.set stream (.subarray b off (+ off len)) cnt)
+      (set! cnt new-count)))
+   (getBytes [bos]
+     (let [new-stream (js/Uint8Array. cnt)]
+       (.set new-stream (.subarray stream 0 cnt))
+       new-stream))
+  p/SeekStream
+  (seek! [bos pos]
+      (if (< cnt pos)
+        (throw (js/Error. (str "Tried to seek to (" pos ").  Stream is of size (" cnt ")"))))
+       (set! cnt pos))
+  ICounted
+  (-count [bos] cnt))
+
+(defn byteOutputStream
+  ([] (byteOutputStream 32))
+  ([len] (->ByteOutputStream (js/Uint8Array. len) 0)))
+
+(deftype ByteInputStream [^:mutable stream ^:mutable cnt]
+  p/ReadStream
+  (read! [bis]
+    (let [old-count cnt]
+      (if (< (.-length stream) cnt)
+        (throw (js/Error. "Can not read (1) bytes, Input Stream only has (0) bytes available")))
+      (set! cnt (inc cnt))
+      (aget stream old-count)))
+  (readBytes! [bis b off len]
+    (let [old-count cnt]
+      (if (< (.-length stream) (+ cnt len off))
+        (throw (js/Error. (str "Can not read (" len ") bytes at offset (" off "), Input Stream only has (" (p/available bis)") bytes available"))))
+      (set! cnt (+ cnt off len))
+      (.set b (.subarray stream (+ old-count off) (+ old-count off len)))))
+  (available [bis] (max 0 (- (.-length stream) cnt)))
+  p/SeekStream
+  (seek! [bis pos]
+      (if (< (.-length stream) pos)
+        (throw (js/Error. (str "Tried to seek to (" pos ").  Stream is of size (" (.-length stream) ")"))))
+       (set! cnt pos))
+  ICounted
+  (-count [bis] (.-length stream)))
+
+(defn byteInputStream [stream]
+  (->ByteInputStream stream 0))

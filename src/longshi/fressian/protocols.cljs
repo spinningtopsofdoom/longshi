@@ -16,6 +16,7 @@
 (defprotocol FressianWriter
   (writeNull! [fw])
   (writeBoolean! [fw b])
+  (writeInt! [fw i])
   (writeDouble! [fw d]))
 
 (defprotocol FressianReader

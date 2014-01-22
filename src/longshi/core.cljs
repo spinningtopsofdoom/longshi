@@ -11,9 +11,15 @@
   (p/writeNull! bos)
   (p/writeBoolean! bos true)
   (p/writeBoolean! bos false)
+  (p/writeDouble! bos 0.0)
+  (p/writeDouble! bos 1.0)
+  (p/writeDouble! bos 1234.56789)
   (let [bis (bs/byteInputStream (p/getBytes bos))]
     (println
      [(p/readObject! bis)
+      (p/readObject! bis)
+      (p/readObject! bis)
+      (p/readObject! bis)
       (p/readObject! bis)
       (p/readObject! bis)
       ])))

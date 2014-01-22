@@ -12,3 +12,9 @@
   (read! [rs])
   (readBytes! [rs b off len])
   (available [rs]))
+
+(defprotocol FressianWriter
+  (writeNull! [fw]))
+
+(defprotocol FressianReader
+  (readObject! [fr]))

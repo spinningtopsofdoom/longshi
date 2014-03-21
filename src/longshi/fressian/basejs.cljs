@@ -1,7 +1,7 @@
 (ns longshi.fressian.basejs
+  (:import [goog.math Long])
   (:require [longshi.fressian.protocols :as p]
             [longshi.fressian.ByteStream :as bs]))
-
 
 (def codes
   #js {
@@ -36,8 +36,8 @@
     0 64
     -1 64
     (if (neg? x)
-      (- 66 (.-length (.toString x 2)))
-      (- 64 (.-length (.toString x 2))))))
+      (- 64 (.getNumBitsAbs (.not (Long.fromNumber x))))
+      (- 64 (.getNumBitsAbs (Long.fromNumber x))))))
 
 (defn is-int [x]
   (zero? (js-mod x 1)))

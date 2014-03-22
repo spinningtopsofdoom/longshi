@@ -18,13 +18,17 @@
   (p/writeInt! bos 8589934591)
   (p/writeInt! bos 2199023255551)
   (p/writeInt! bos 281474976710655)
+  (p/writeInt! bos 9007199254740991)
   (p/writeInt! bos -2147483648)
   (p/writeInt! bos -8589934592)
   (p/writeInt! bos -2199023255552)
   (p/writeInt! bos -562949953421312)
+  (p/writeInt! bos -9007199254740991)
   (let [bis (bs/byteInputStream (p/getBytes bos))]
     (println
      [(p/readObject! bis)
+      (p/readObject! bis)
+      (p/readObject! bis)
       (p/readObject! bis)
       (p/readObject! bis)
       (p/readObject! bis)

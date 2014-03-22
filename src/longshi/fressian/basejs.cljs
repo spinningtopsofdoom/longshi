@@ -17,13 +17,15 @@
        :INT_PACKED_5_ZERO 0x76
        :INT_PACKED_6_ZERO 0x7A
        :INT_PACKED_7_ZERO 0x7E
+       :INT 0xF8
        })
-
 (def ^:private little-endian false)
 ;;Double buffer
 (def ^:private da (js/Uint8Array. 8))
 (def ^:private dadv (js/DataView. (.-buffer da)))
 ;;Integer constants
+(def ^:private max-neg-js-hb-int (bit-shift-left -1 21))
+(def ^:private max-pos-js-hb-int (dec (bit-shift-left 1 21)))
 (def ^:private two-power-16 (bit-shift-left 1 16))
 (def ^:private two-power-24 (bit-shift-left 1 24))
 (def ^:private two-power-32 (* two-power-16 two-power-16))
@@ -49,6 +51,14 @@
   (writeInt! [bos i]
     (let [bits (bit-switch i)]
       (case bits
+        (11 12 13 14)
+        (let [hb (bit-or (/ i two-power-32) 0)
+              hb (if (neg? hb) (bit-not (unchecked-negate hb)) hb)]
+          (do
+            (p/write! bos (.-INT codes))
+            (.setInt32 i64adv 0 hb)
+            (.setInt32 i64adv 4 i little-endian)
+            (p/writeBytes! bos i64a 0 8)))
         (15 16 17 18 19 20 21 22)
         (let [hb (bit-shift-right (bit-or (/ i two-power-24) 0) 8)
               ic (bit-shift-right hb 16)]
@@ -89,7 +99,8 @@
         (do
           (if (< -1 i)
           (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right i 8))))
-          (p/write! bos i)))))
+          (p/write! bos i))
+        (throw (js/Error. (str "Number (" i ") can not be converted"))))))
   (writeDouble! [bos d]
     (case d
       0.0 (p/write! bos (.-DOUBLE_0 codes))
@@ -174,6 +185,17 @@
             0x7D (+ i48 (* -1 two-power-16 two-power-32))
             0x7E i48
             0x7F (+ i48 (* two-power-16 two-power-32))))
+        ((.-INT codes))
+        (let [ih32 (do
+                    (p/readBytes! bis i64a 0 4)
+                    (.getInt32 i64adv 0 little-endian))
+              il32 (do
+                    (p/readBytes! bis i64a 0 4)
+                    (.getUint32 i64adv 0 little-endian))]
+          (if (or (> ih32 max-pos-js-hb-int) (< ih32 max-neg-js-hb-int))
+            (Long. il32 ih32)
+            (+ (* ih32 two-power-32) il32)))
+
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
         ((.-DOUBLE codes)) (p/readDouble! bis)))))

@@ -34,12 +34,12 @@
 (def ^:private i64adv (js/DataView. (.-buffer i64a)))
 ;;Integer helpers
 (defn bit-switch [x]
-  (case x
-    0 64
-    -1 64
+  (cond
+    (or (.equals Long/ONE x) (.equals Long.NEG_ONE x)) 64
+    :else
     (if (neg? x)
-      (- 64 (.getNumBitsAbs (.not (Long.fromNumber x))))
-      (- 64 (.getNumBitsAbs (Long.fromNumber x))))))
+      (- 64 (.getNumBitsAbs (.not x)))
+      (- 64 (.getNumBitsAbs x)))))
 
 (defn is-int [x]
   (zero? (js-mod x 1)))
@@ -49,58 +49,57 @@
   (write-null! [bos] (p/write! bos (.-NULL codes)))
   (write-boolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
   (write-int! [bos i]
-    (let [bits (bit-switch i)]
+    (p/write-long! bos (Long.fromNumber i)))
+  (write-long! [bos l]
+    (let [lb (.getLowBits l)
+          hb (.getHighBits l)
+          bits (bit-switch l)]
       (case bits
-        (11 12 13 14)
-        (let [hb (bit-or (/ i two-power-32) 0)
-              hb (if (neg? hb) (bit-not (unchecked-negate hb)) hb)]
-          (do
-            (p/write! bos (.-INT codes))
-            (.setInt32 i64adv 0 hb)
-            (.setInt32 i64adv 4 i little-endian)
-            (p/write-bytes! bos i64a 0 8)))
+        (1 2 3 4 5 6 7 8 9 10 11 12 13 14)
+        (do
+          (p/write! bos (.-INT codes))
+          (.setInt32 i64adv 0 hb)
+          (.setInt32 i64adv 4 lb little-endian)
+          (p/write-bytes! bos i64a 0 8))
         (15 16 17 18 19 20 21 22)
-        (let [hb (bit-shift-right (bit-or (/ i two-power-24) 0) 8)
-              ic (bit-shift-right hb 16)]
+        (let [ic (bit-shift-right hb 16)]
           (do
             (p/write! bos (+ (.-INT_PACKED_7_ZERO codes) ic))
             (.setInt16 i64adv 0 hb)
-            (.setInt32 i64adv 2 i little-endian)
+            (.setInt32 i64adv 2 lb little-endian)
             (p/write-bytes! bos i64a 0 6)))
         (23 24 25 26 27 28 29 30)
-        (let [hb (bit-shift-right (bit-or (/ i two-power-16) 0) 16)
-              ic (bit-shift-right hb 8)]
+        (let [ic (bit-shift-right hb 8)]
           (do
             (p/write! bos (+ (.-INT_PACKED_6_ZERO codes) ic))
             (.setInt8 i64adv 0 hb)
-            (.setInt32 i64adv 1 i little-endian)
+            (.setInt32 i64adv 1 lb little-endian)
             (p/write-bytes! bos i64a 0 5)))
         (31 32 33 34 35 36 37 38)
-        (let [ic (bit-shift-right (bit-or (/ i two-power-16) 0) 16)]
-          (do
-            (p/write! bos (+ (.-INT_PACKED_5_ZERO codes) ic))
-            (.setInt32 i64adv 0 i little-endian)
-            (p/write-bytes! bos i64a 0 4)))
+        (do
+          (p/write! bos (+ (.-INT_PACKED_5_ZERO codes) hb))
+          (.setInt32 i64adv 0 lb little-endian)
+          (p/write-bytes! bos i64a 0 4))
         (39 40 41 42 43 44)
         (do
-          (p/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right i 24)))
-          (.setInt32 i64adv 0 i little-endian)
+          (p/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right lb 24)))
+          (.setInt32 i64adv 0 lb little-endian)
           (p/write-bytes! bos i64a 0 3))
         (45 46 47 48 49 50 51)
         (do
-          (p/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right i 16)))
-          (.setInt16 i64adv 0 i little-endian)
+          (p/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right lb 16)))
+          (.setInt16 i64adv 0 lb little-endian)
           (p/write-bytes! bos i64a 0 2))
         (52 53 54 55 56 57)
         (do
-          (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right i 8)))
-          (p/write! bos i))
+          (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8)))
+          (p/write! bos lb))
         (58 59 60 61 62 63 64)
         (do
-          (if (< -1 i)
-          (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right i 8))))
-          (p/write! bos i))
-        (throw (js/Error. (str "Number (" i ") can not be converted"))))))
+          (when (< lb -1)
+            (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8))))
+          (p/write! bos lb))
+        (throw (js/Error. (str "Long (" i ") can not be converted"))))))
   (write-double! [bos d]
     (case d
       0.0 (p/write! bos (.-DOUBLE_0 codes))

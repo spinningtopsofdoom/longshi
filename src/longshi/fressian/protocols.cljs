@@ -17,6 +17,7 @@
   (write-null! [fw])
   (write-boolean! [fw b])
   (write-int! [fw i])
+  (write-long! [fw l])
   (write-double! [fw d]))
 
 (defprotocol FressianReader

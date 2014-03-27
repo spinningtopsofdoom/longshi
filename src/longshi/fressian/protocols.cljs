@@ -5,20 +5,20 @@
 
 (defprotocol WriteStream
   (write! [ws b])
-  (writeBytes! [ws b off len])
-  (getBytes [ws]))
+  (write-bytes! [ws b off len])
+  (get-bytes [ws]))
 
 (defprotocol ReadStream
   (read! [rs])
-  (readBytes! [rs b off len])
+  (read-bytes! [rs b off len])
   (available [rs]))
 
 (defprotocol FressianWriter
-  (writeNull! [fw])
-  (writeBoolean! [fw b])
-  (writeInt! [fw i])
-  (writeDouble! [fw d]))
+  (write-null! [fw])
+  (write-boolean! [fw b])
+  (write-int! [fw i])
+  (write-double! [fw d]))
 
 (defprotocol FressianReader
-  (readDouble! [fr])
-  (readObject! [fr]))
+  (read-double! [fr])
+  (read-object! [fr]))

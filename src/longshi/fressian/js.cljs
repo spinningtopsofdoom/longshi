@@ -1,7 +1,7 @@
-(ns longshi.fressian.basejs
+(ns longshi.fressian.js
   (:import [goog.math Long])
   (:require [longshi.fressian.protocols :as p]
-            [longshi.fressian.ByteStream :as bs]))
+            [longshi.fressian.byte-stream :as bs]))
 
 (def codes
   #js {
@@ -46,9 +46,9 @@
 
 (extend-type bs/ByteOutputStream
   p/FressianWriter
-  (writeNull! [bos] (p/write! bos (.-NULL codes)))
-  (writeBoolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
-  (writeInt! [bos i]
+  (write-null! [bos] (p/write! bos (.-NULL codes)))
+  (write-boolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
+  (write-int! [bos i]
     (let [bits (bit-switch i)]
       (case bits
         (11 12 13 14)
@@ -58,7 +58,7 @@
             (p/write! bos (.-INT codes))
             (.setInt32 i64adv 0 hb)
             (.setInt32 i64adv 4 i little-endian)
-            (p/writeBytes! bos i64a 0 8)))
+            (p/write-bytes! bos i64a 0 8)))
         (15 16 17 18 19 20 21 22)
         (let [hb (bit-shift-right (bit-or (/ i two-power-24) 0) 8)
               ic (bit-shift-right hb 16)]
@@ -66,7 +66,7 @@
             (p/write! bos (+ (.-INT_PACKED_7_ZERO codes) ic))
             (.setInt16 i64adv 0 hb)
             (.setInt32 i64adv 2 i little-endian)
-            (p/writeBytes! bos i64a 0 6)))
+            (p/write-bytes! bos i64a 0 6)))
         (23 24 25 26 27 28 29 30)
         (let [hb (bit-shift-right (bit-or (/ i two-power-16) 0) 16)
               ic (bit-shift-right hb 8)]
@@ -74,23 +74,23 @@
             (p/write! bos (+ (.-INT_PACKED_6_ZERO codes) ic))
             (.setInt8 i64adv 0 hb)
             (.setInt32 i64adv 1 i little-endian)
-            (p/writeBytes! bos i64a 0 5)))
+            (p/write-bytes! bos i64a 0 5)))
         (31 32 33 34 35 36 37 38)
         (let [ic (bit-shift-right (bit-or (/ i two-power-16) 0) 16)]
           (do
             (p/write! bos (+ (.-INT_PACKED_5_ZERO codes) ic))
             (.setInt32 i64adv 0 i little-endian)
-            (p/writeBytes! bos i64a 0 4)))
+            (p/write-bytes! bos i64a 0 4)))
         (39 40 41 42 43 44)
         (do
           (p/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right i 24)))
           (.setInt32 i64adv 0 i little-endian)
-          (p/writeBytes! bos i64a 0 3))
+          (p/write-bytes! bos i64a 0 3))
         (45 46 47 48 49 50 51)
         (do
           (p/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right i 16)))
           (.setInt16 i64adv 0 i little-endian)
-          (p/writeBytes! bos i64a 0 2))
+          (p/write-bytes! bos i64a 0 2))
         (52 53 54 55 56 57)
         (do
           (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right i 8)))
@@ -101,21 +101,21 @@
           (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right i 8))))
           (p/write! bos i))
         (throw (js/Error. (str "Number (" i ") can not be converted"))))))
-  (writeDouble! [bos d]
+  (write-double! [bos d]
     (case d
       0.0 (p/write! bos (.-DOUBLE_0 codes))
       1.0 (p/write! bos (.-DOUBLE_1 codes))
       (do
         (p/write! bos (.-DOUBLE codes))
         (.setFloat64 dadv 0 d little-endian)
-        (p/writeBytes! bos da 0 8)))))
+        (p/write-bytes! bos da 0 8)))))
 
 (extend-type bs/ByteInputStream
   p/FressianReader
-  (readDouble! [bis]
-     (p/readBytes! bis da 0 8)
+  (read-double! [bis]
+     (p/read-bytes! bis da 0 8)
      (.getFloat64 dadv 0 little-endian))
-  (readObject! [bis]
+  (read-object! [bis]
     (let [code (p/read! bis)]
       (case code
         ((.-NULL codes)) nil
@@ -143,18 +143,18 @@
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_3_ZERO codes)) 16)
           (do
-            (p/readBytes! bis i64a 0 2)
+            (p/read-bytes! bis i64a 0 2)
             (.getInt16 i64adv 0 little-endian)))
         (0x70 0x71 0x72 0x73)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_4_ZERO codes)) 24)
           (do
-            (p/readBytes! bis i64a 0 3)
+            (p/read-bytes! bis i64a 0 3)
             (aset i64a 3 0)
             (.getInt32 i64adv 0 little-endian)))
         (0x74 0x75 0x76 0x77)
         (let [i32 (do
-                    (p/readBytes! bis i64a 0 4)
+                    (p/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))]
           (case code
             0x74 (+ i32 (* -2 two-power-32))
@@ -164,7 +164,7 @@
         (0x78 0x79 0x7A 0x7B)
         (let [ih8 (p/read! bis)
               il32 (do
-                    (p/readBytes! bis i64a 0 4)
+                    (p/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))
               i40 (+ (* ih8 two-power-32) il32)]
           (case code
@@ -174,10 +174,10 @@
             0x7B (+ i40 (* 256 two-power-32))))
         (0x7C 0x7D 0x7E 0x7F)
         (let [ih16 (do
-                    (p/readBytes! bis i64a 0 2)
+                    (p/read-bytes! bis i64a 0 2)
                     (.getUint16 i64adv 0 little-endian))
               il32 (do
-                    (p/readBytes! bis i64a 0 4)
+                    (p/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))
               i48 (+ (* ih16 two-power-32) il32)]
           (case code
@@ -187,10 +187,10 @@
             0x7F (+ i48 (* two-power-16 two-power-32))))
         ((.-INT codes))
         (let [ih32 (do
-                    (p/readBytes! bis i64a 0 4)
+                    (p/read-bytes! bis i64a 0 4)
                     (.getInt32 i64adv 0 little-endian))
               il32 (do
-                    (p/readBytes! bis i64a 0 4)
+                    (p/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))]
           (if (or (> ih32 max-pos-js-hb-int) (< ih32 max-neg-js-hb-int))
             (Long. il32 ih32)
@@ -198,4 +198,4 @@
 
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
-        ((.-DOUBLE codes)) (p/readDouble! bis)))))
+        ((.-DOUBLE codes)) (p/read-double! bis)))))

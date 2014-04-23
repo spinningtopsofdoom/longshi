@@ -143,14 +143,14 @@
           (bit-shift-left (- code (.-INT_PACKED_3_ZERO codes)) 16)
           (do
             (p/read-bytes! bis i64a 0 2)
-            (.getInt16 i64adv 0 little-endian)))
+            (.getUint16 i64adv 0 little-endian)))
         (0x70 0x71 0x72 0x73)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_4_ZERO codes)) 24)
           (do
             (p/read-bytes! bis i64a 0 3)
             (aset i64a 3 0)
-            (.getInt32 i64adv 0 little-endian)))
+            (.getUint32 i64adv 0 little-endian)))
         (0x74 0x75 0x76 0x77)
         (let [i32 (do
                     (p/read-bytes! bis i64a 0 4)

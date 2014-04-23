@@ -99,7 +99,7 @@
           (when (< lb -1)
             (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8))))
           (p/write! bos lb))
-        (throw (js/Error. (str "Long (" i ") can not be converted"))))))
+        (throw (js/Error. (str "Long (" l ") can not be converted"))))))
   (write-double! [bos d]
     (case d
       0.0 (p/write! bos (.-DOUBLE_0 codes))

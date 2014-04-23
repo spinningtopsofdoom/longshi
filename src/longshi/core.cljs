@@ -31,9 +31,15 @@
   (p/write-int! bos -562949953421312)
   (p/write-int! bos -9007199254740991)
   (p/write-long! bos (Long.fromString "-9223372036854775808"))
+  (p/write-string! bos "你好，先生好日")
+  (p/write-string! bos "foo")
+  (p/write-string! bos "foobarness")
   (let [bis (bs/byte-input-stream (p/get-bytes bos))]
     (println
      [(p/read-object! bis)
+      (p/read-object! bis)
+      (p/read-object! bis)
+      (p/read-object! bis)
       (p/read-object! bis)
       (p/read-object! bis)
       (p/read-object! bis)

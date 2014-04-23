@@ -18,7 +18,16 @@
        :INT_PACKED_6_ZERO 0x7A
        :INT_PACKED_7_ZERO 0x7E
        :INT 0xF8
+       :STRING 0xE3
+       :STRING_PACKED_LENGTH_START 0xDA
+       :STRING_CHUNK 0xE2
        })
+
+(def ranges
+  #js {
+       :STRING_PACKED_LENGTH_END 8
+       })
+
 (def ^:private little-endian false)
 ;;Double buffer
 (def ^:private da (js/Uint8Array. 8))
@@ -44,10 +53,51 @@
 (defn is-int [x]
   (zero? (js-mod x 1)))
 
+(defn string-chunk-utf8! [s start buffer]
+  (loop [str-pos start buf-pos 0]
+    (let [ch (.charCodeAt s str-pos)
+          ch-enc-size (cond
+                        (<= ch 0x007f) 1
+                        (> ch 0x07ff) 3
+                          :else 2)]
+      (if (and (< str-pos (.-length s)) (<= (+ buf-pos ch-enc-size) (.-length buffer)))
+        (do
+          (case ch-enc-size
+            1 (aset buffer buf-pos ch)
+            2 (do
+                (aset buffer buf-pos (bit-or (bit-and (bit-shift-right ch 6) 0x1f) 0xc0))
+                (aset buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right ch 0) 0x3f) 0x80)))
+            3 (do
+                (aset buffer buf-pos (bit-or (bit-and (bit-shift-right ch 12) 0x0f) 0xe0))
+                (aset buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right ch 6) 0x3f) 0x80))
+                (aset buffer (+ 2 buf-pos) (bit-or (bit-and (bit-shift-right ch 0) 0x3f) 0x80))))
+          (recur (inc str-pos) (+ buf-pos ch-enc-size)))
+        #js [str-pos buf-pos]))))
+
 (extend-type bs/ByteOutputStream
   p/FressianWriter
   (write-null! [bos] (p/write! bos (.-NULL codes)))
   (write-boolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
+  (write-string! [bos s]
+    (let [max-bytes (Math/min (* (.-length s) 3) 65536)
+          sba (js/Uint8Array. max-bytes)]
+      (loop [str-pos 0]
+        (let [sa (string-chunk-utf8! s str-pos sba)
+              new-str-pos (aget sa 0)
+              buf-pos (aget sa 1)]
+          (cond
+            (< buf-pos (.-STRING_PACKED_LENGTH_END ranges)) (p/write! bos (+ (.-STRING_PACKED_LENGTH_START codes) buf-pos))
+            (= new-str-pos (.-length s))
+              (do
+                (p/write! bos (.-STRING codes))
+                (p/write-int! bos buf-pos))
+            :else
+              (do
+                (p/write! bos (.-STRING_CHUNK codes))
+                (p/write-int! bos buf-pos)))
+          (p/write-bytes! bos sba 0 buf-pos)
+          (if (< new-str-pos (.-length s))
+            (recur new-str-pos))))))
   (write-int! [bos i]
     (p/write-long! bos (Long.fromNumber i)))
   (write-long! [bos l]
@@ -108,6 +158,36 @@
         (p/write! bos (.-DOUBLE codes))
         (.setFloat64 dadv 0 d little-endian)
         (p/write-bytes! bos da 0 8)))))
+
+(defn read-utf8-chars! [dest source offset length]
+  (loop [pos offset]
+    (when-let [ch (aget source pos)]
+      (case (bit-shift-right ch 4)
+        (0 1 2 3 4 5 6 7)
+        (do
+          (.push dest ch)
+          (recur (inc pos)))
+        (12 13)
+        (let [ch1 (aget source (inc pos))]
+          (do
+            (.push dest (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
+            (recur (+ 2 pos))))
+        (14)
+        (let [ch1 (aget source (inc pos))
+              ch2 (aget source (+ 2 pos))]
+          (do
+            (.push dest (bit-or
+                          (bit-and ch2 0x3f)
+                          (bit-shift-left (bit-and ch1 0x3f) 6)
+                          (bit-shift-left (bit-and ch 0x0f) 12)))
+            (recur (+ 3 pos))))
+        (throw (js/Error. (str "Invalid UTF Character (" ch ")")))))))
+
+(defn read-string-buffer! [bis string-buffer byte-len]
+  (let [byte-buffer (js/Uint8Array. byte-len)]
+    (do
+      (p/read-bytes! bis byte-buffer 0 byte-len)
+      (read-utf8-chars! string-buffer byte-buffer 0 byte-len))))
 
 (extend-type bs/ByteInputStream
   p/FressianReader
@@ -194,7 +274,37 @@
           (if (or (> ih32 max-pos-js-hb-int) (< ih32 max-neg-js-hb-int))
             (Long. il32 ih32)
             (+ (* ih32 two-power-32) il32)))
-
+        ((.-STRING codes))
+        (let [string-buffer (array)]
+          (do
+            (read-string-buffer! bis string-buffer (p/read-object! bis))
+            (apply String/fromCharCode string-buffer)))
+        (0xDA 0xDB 0xDC 0xDD 0xDE 0xDF 0xE0 0xE1)
+        (let [string-buffer (array)]
+          (do
+            (read-string-buffer! bis string-buffer (- code (.-STRING_PACKED_LENGTH_START codes)))
+            (apply String/fromCharCode string-buffer)))
+        ((.-STRING_CHUNK codes))
+        (let [chunk-string-buffer (array)
+              string-buffer (array (array))]
+          (do
+            (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+            (loop []
+              (.push chunk-string-buffer (apply String/fromCharCode (aget string-buffer 0)))
+              (aset string-buffer 0 (array))
+              (let [next-code (p/read! bis)]
+                (case next-code
+                  ((.-STRING codes))
+                  (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+                  (0xDA 0xDB 0xDC 0xDD 0xDE 0xDF 0xE0 0xE1)
+                  (read-string-buffer! bis (aget string-buffer 0) (- next-code (.-STRING_PACKED_LENGTH_START codes)))
+                  ((.-STRING_CHUNK codes))
+                    (do
+                      (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+                      (recur))
+                  (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
+            (.push chunk-string-buffer (apply String/fromCharCode (aget string-buffer 0)))
+            (.join chunk-string-buffer "")))
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
         ((.-DOUBLE codes)) (p/read-double! bis)))))

@@ -18,7 +18,8 @@
   (write-boolean! [fw b])
   (write-int! [fw i])
   (write-long! [fw l])
-  (write-double! [fw d]))
+  (write-double! [fw d])
+  (write-string! [fw s]))
 
 (defprotocol FressianReader
   (read-double! [fr])

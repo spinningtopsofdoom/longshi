@@ -1,6 +1,7 @@
 (ns longshi.core
   (:import [goog.math Long])
-  (:require [longshi.fressian.protocols :as p]
+  (:require [longshi.fressian.byte-stream-protocols :as bsp]
+            [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]
             [longshi.fressian.js :as bjs]))
 
@@ -34,7 +35,7 @@
   (p/write-string! bos "你好，先生好日")
   (p/write-string! bos "foo")
   (p/write-string! bos "foobarness")
-  (let [bis (bs/byte-input-stream (p/get-bytes bos))]
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))]
     (println
      [(p/read-object! bis)
       (p/read-object! bis)

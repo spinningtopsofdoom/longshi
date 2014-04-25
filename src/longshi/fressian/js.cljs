@@ -1,7 +1,8 @@
 (ns longshi.fressian.js
   (:import [goog.math Long])
   (:use-macros [longshi.macros :only [local set-local get-local make-byte-array make-data-view]])
-  (:require [longshi.fressian.protocols :as p]
+  (:require [longshi.fressian.byte-stream-protocols :as bsp]
+            [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]))
 
 (def codes
@@ -77,8 +78,8 @@
 
 (extend-type bs/ByteOutputStream
   p/FressianWriter
-  (write-null! [bos] (p/write! bos (.-NULL codes)))
-  (write-boolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
+  (write-null! [bos] (bsp/write! bos (.-NULL codes)))
+  (write-boolean! [bos b] (bsp/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
   (write-string! [bos s]
     (let [max-bytes (Math/min (* (.-length s) 3) 65536)
           sba (make-byte-array max-bytes)]
@@ -87,16 +88,16 @@
               new-str-pos (aget sa 0)
               buf-pos (aget sa 1)]
           (cond
-            (< buf-pos (.-STRING_PACKED_LENGTH_END ranges)) (p/write! bos (+ (.-STRING_PACKED_LENGTH_START codes) buf-pos))
+            (< buf-pos (.-STRING_PACKED_LENGTH_END ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START codes) buf-pos))
             (= new-str-pos (.-length s))
               (do
-                (p/write! bos (.-STRING codes))
+                (bsp/write! bos (.-STRING codes))
                 (p/write-int! bos buf-pos))
             :else
               (do
-                (p/write! bos (.-STRING_CHUNK codes))
+                (bsp/write! bos (.-STRING_CHUNK codes))
                 (p/write-int! bos buf-pos)))
-          (p/write-bytes! bos sba 0 buf-pos)
+          (bsp/write-bytes! bos sba 0 buf-pos)
           (if (< new-str-pos (.-length s))
             (recur new-str-pos))))))
   (write-int! [bos i]
@@ -108,57 +109,57 @@
       (case bits
         (1 2 3 4 5 6 7 8 9 10 11 12 13 14)
         (do
-          (p/write! bos (.-INT codes))
+          (bsp/write! bos (.-INT codes))
           (.setInt32 i64adv 0 hb)
           (.setInt32 i64adv 4 lb little-endian)
-          (p/write-bytes! bos i64a 0 8))
+          (bsp/write-bytes! bos i64a 0 8))
         (15 16 17 18 19 20 21 22)
         (let [ic (bit-shift-right hb 16)]
           (do
-            (p/write! bos (+ (.-INT_PACKED_7_ZERO codes) ic))
+            (bsp/write! bos (+ (.-INT_PACKED_7_ZERO codes) ic))
             (.setInt16 i64adv 0 hb)
             (.setInt32 i64adv 2 lb little-endian)
-            (p/write-bytes! bos i64a 0 6)))
+            (bsp/write-bytes! bos i64a 0 6)))
         (23 24 25 26 27 28 29 30)
         (let [ic (bit-shift-right hb 8)]
           (do
-            (p/write! bos (+ (.-INT_PACKED_6_ZERO codes) ic))
+            (bsp/write! bos (+ (.-INT_PACKED_6_ZERO codes) ic))
             (.setInt8 i64adv 0 hb)
             (.setInt32 i64adv 1 lb little-endian)
-            (p/write-bytes! bos i64a 0 5)))
+            (bsp/write-bytes! bos i64a 0 5)))
         (31 32 33 34 35 36 37 38)
         (do
-          (p/write! bos (+ (.-INT_PACKED_5_ZERO codes) hb))
+          (bsp/write! bos (+ (.-INT_PACKED_5_ZERO codes) hb))
           (.setInt32 i64adv 0 lb little-endian)
-          (p/write-bytes! bos i64a 0 4))
+          (bsp/write-bytes! bos i64a 0 4))
         (39 40 41 42 43 44)
         (do
-          (p/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right lb 24)))
+          (bsp/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right lb 24)))
           (.setInt32 i64adv 0 lb little-endian)
-          (p/write-bytes! bos i64a 0 3))
+          (bsp/write-bytes! bos i64a 0 3))
         (45 46 47 48 49 50 51)
         (do
-          (p/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right lb 16)))
+          (bsp/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right lb 16)))
           (.setInt16 i64adv 0 lb little-endian)
-          (p/write-bytes! bos i64a 0 2))
+          (bsp/write-bytes! bos i64a 0 2))
         (52 53 54 55 56 57)
         (do
-          (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8)))
-          (p/write! bos lb))
+          (bsp/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8)))
+          (bsp/write! bos lb))
         (58 59 60 61 62 63 64)
         (do
           (when (< lb -1)
-            (p/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8))))
-          (p/write! bos lb))
+            (bsp/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8))))
+          (bsp/write! bos lb))
         (throw (js/Error. (str "Long (" l ") can not be converted"))))))
   (write-double! [bos d]
     (case d
-      0.0 (p/write! bos (.-DOUBLE_0 codes))
-      1.0 (p/write! bos (.-DOUBLE_1 codes))
+      0.0 (bsp/write! bos (.-DOUBLE_0 codes))
+      1.0 (bsp/write! bos (.-DOUBLE_1 codes))
       (do
-        (p/write! bos (.-DOUBLE codes))
+        (bsp/write! bos (.-DOUBLE codes))
         (.setFloat64 dadv 0 d little-endian)
-        (p/write-bytes! bos da 0 8)))))
+        (bsp/write-bytes! bos da 0 8)))))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]
@@ -187,16 +188,16 @@
 (defn read-string-buffer! [bis string-buffer byte-len]
   (let [byte-buffer (make-byte-array byte-len)]
     (do
-      (p/read-bytes! bis byte-buffer 0 byte-len)
+      (bsp/read-bytes! bis byte-buffer 0 byte-len)
       (read-utf8-chars! string-buffer byte-buffer 0 byte-len))))
 
 (extend-type bs/ByteInputStream
   p/FressianReader
   (read-double! [bis]
-     (p/read-bytes! bis da 0 8)
+     (bsp/read-bytes! bis da 0 8)
      (.getFloat64 dadv 0 little-endian))
   (read-object! [bis]
-    (let [code (p/read! bis)]
+    (let [code (bsp/read! bis)]
       (case code
         ((.-NULL codes)) nil
         ((.-TRUE codes)) true
@@ -217,24 +218,24 @@
          0x58 0x59 0x5A 0x5B 0x5C 0x5D 0x5E 0x5F)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_2_ZERO codes)) 8)
-          (p/read! bis))
+          (bsp/read! bis))
         (0x60 0x61 0x62 0x63 0x64 0x65 0x66 0x67
          0x68 0x69 0x6A 0x6B 0x6C 0x6D 0x6E 0x6F)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_3_ZERO codes)) 16)
           (do
-            (p/read-bytes! bis i64a 0 2)
+            (bsp/read-bytes! bis i64a 0 2)
             (.getUint16 i64adv 0 little-endian)))
         (0x70 0x71 0x72 0x73)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_4_ZERO codes)) 24)
           (do
-            (p/read-bytes! bis i64a 0 3)
+            (bsp/read-bytes! bis i64a 0 3)
             (aset i64a 3 0)
             (.getUint32 i64adv 0 little-endian)))
         (0x74 0x75 0x76 0x77)
         (let [i32 (do
-                    (p/read-bytes! bis i64a 0 4)
+                    (bsp/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))]
           (case code
             0x74 (+ i32 (* -2 two-power-32))
@@ -242,9 +243,9 @@
             0x76 i32
             0x77 (+ i32 two-power-32)))
         (0x78 0x79 0x7A 0x7B)
-        (let [ih8 (p/read! bis)
+        (let [ih8 (bsp/read! bis)
               il32 (do
-                    (p/read-bytes! bis i64a 0 4)
+                    (bsp/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))
               i40 (+ (* ih8 two-power-32) il32)]
           (case code
@@ -254,10 +255,10 @@
             0x7B (+ i40 (* 256 two-power-32))))
         (0x7C 0x7D 0x7E 0x7F)
         (let [ih16 (do
-                    (p/read-bytes! bis i64a 0 2)
+                    (bsp/read-bytes! bis i64a 0 2)
                     (.getUint16 i64adv 0 little-endian))
               il32 (do
-                    (p/read-bytes! bis i64a 0 4)
+                    (bsp/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))
               i48 (+ (* ih16 two-power-32) il32)]
           (case code
@@ -267,10 +268,10 @@
             0x7F (+ i48 (* two-power-16 two-power-32))))
         ((.-INT codes))
         (let [ih32 (do
-                    (p/read-bytes! bis i64a 0 4)
+                    (bsp/read-bytes! bis i64a 0 4)
                     (.getInt32 i64adv 0 little-endian))
               il32 (do
-                    (p/read-bytes! bis i64a 0 4)
+                    (bsp/read-bytes! bis i64a 0 4)
                     (.getUint32 i64adv 0 little-endian))]
           (if (or (> ih32 max-pos-js-hb-int) (< ih32 max-neg-js-hb-int))
             (Long. il32 ih32)
@@ -293,7 +294,7 @@
             (loop []
               (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
               (set-local string-buffer (array))
-              (let [next-code (p/read! bis)]
+              (let [next-code (bsp/read! bis)]
                 (case next-code
                   ((.-STRING codes))
                   (read-string-buffer! bis (get-local string-buffer) (p/read-object! bis))

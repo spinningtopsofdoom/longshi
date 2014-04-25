@@ -1,5 +1,6 @@
 (ns longshi.fressian.js
   (:import [goog.math Long])
+  (:use-macros [longshi.macros :only [local set-local get-local make-byte-array make-data-view]])
   (:require [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]))
 
@@ -30,8 +31,8 @@
 
 (def ^:private little-endian false)
 ;;Double buffer
-(def ^:private da (js/Uint8Array. 8))
-(def ^:private dadv (js/DataView. (.-buffer da)))
+(def ^:private da (make-byte-array 8))
+(def ^:private dadv (make-data-view da))
 ;;Integer constants
 (def ^:private max-neg-js-hb-int (bit-shift-left -1 21))
 (def ^:private max-pos-js-hb-int (dec (bit-shift-left 1 21)))
@@ -39,8 +40,8 @@
 (def ^:private two-power-24 (bit-shift-left 1 24))
 (def ^:private two-power-32 (* two-power-16 two-power-16))
 ;;Integer buffer
-(def ^:private i64a (js/Uint8Array. 8))
-(def ^:private i64adv (js/DataView. (.-buffer i64a)))
+(def ^:private i64a (make-byte-array 8))
+(def ^:private i64adv (make-data-view i64a))
 ;;Integer helpers
 (defn bit-switch [x]
   (cond
@@ -80,7 +81,7 @@
   (write-boolean! [bos b] (p/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
   (write-string! [bos s]
     (let [max-bytes (Math/min (* (.-length s) 3) 65536)
-          sba (js/Uint8Array. max-bytes)]
+          sba (make-byte-array max-bytes)]
       (loop [str-pos 0]
         (let [sa (string-chunk-utf8! s str-pos sba)
               new-str-pos (aget sa 0)
@@ -184,7 +185,7 @@
         (throw (js/Error. (str "Invalid UTF Character (" ch ")")))))))
 
 (defn read-string-buffer! [bis string-buffer byte-len]
-  (let [byte-buffer (js/Uint8Array. byte-len)]
+  (let [byte-buffer (make-byte-array byte-len)]
     (do
       (p/read-bytes! bis byte-buffer 0 byte-len)
       (read-utf8-chars! string-buffer byte-buffer 0 byte-len))))
@@ -286,24 +287,24 @@
             (apply String/fromCharCode string-buffer)))
         ((.-STRING_CHUNK codes))
         (let [chunk-string-buffer (array)
-              string-buffer (array (array))]
+              string-buffer (local (array))]
           (do
             (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
             (loop []
-              (.push chunk-string-buffer (apply String/fromCharCode (aget string-buffer 0)))
-              (aset string-buffer 0 (array))
+              (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
+              (set-local string-buffer (array))
               (let [next-code (p/read! bis)]
                 (case next-code
                   ((.-STRING codes))
-                  (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+                  (read-string-buffer! bis (get-local string-buffer) (p/read-object! bis))
                   (0xDA 0xDB 0xDC 0xDD 0xDE 0xDF 0xE0 0xE1)
-                  (read-string-buffer! bis (aget string-buffer 0) (- next-code (.-STRING_PACKED_LENGTH_START codes)))
+                  (read-string-buffer! bis (get-local string-buffer) (- next-code (.-STRING_PACKED_LENGTH_START codes)))
                   ((.-STRING_CHUNK codes))
                     (do
-                      (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+                      (read-string-buffer! bis (get-local string-buffer) (p/read-object! bis))
                       (recur))
                   (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
-            (.push chunk-string-buffer (apply String/fromCharCode (aget string-buffer 0)))
+            (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
             (.join chunk-string-buffer "")))
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0

@@ -1,4 +1,5 @@
 (ns longshi.fressian.byte-stream
+  (:use-macros [longshi.macros :only [make-byte-array make-data-view]])
   (:require [longshi.fressian.protocols :as p]))
 
 (deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
@@ -6,7 +7,7 @@
   (write! [bos b]
     (let [new-count (inc cnt)]
       (if (< (.-length stream) new-count)
-        (let [new-stream (js/Uint8Array. (max new-count (bit-shift-left cnt 1)))]
+        (let [new-stream (make-byte-array (max new-count (bit-shift-left cnt 1)))]
           (.set new-stream stream)
           (set! stream new-stream)))
       (aset stream cnt b)
@@ -14,13 +15,13 @@
   (write-bytes! [bos b off len]
     (let [new-count (+ cnt len)]
       (if (< (.-length stream) new-count)
-        (let [new-stream (js/Uint8Array. (max new-count (bit-shift-left cnt 1)))]
+        (let [new-stream (make-byte-array (max new-count (bit-shift-left cnt 1)))]
           (.set new-stream stream)
           (set! stream new-stream)))
       (.set stream (.subarray b off (+ off len)) cnt)
       (set! cnt new-count)))
    (get-bytes [bos]
-     (let [new-stream (js/Uint8Array. cnt)]
+     (let [new-stream (make-byte-array cnt)]
        (.set new-stream (.subarray stream 0 cnt))
        new-stream))
   p/SeekStream
@@ -33,7 +34,7 @@
 
 (defn byte-output-stream
   ([] (byte-output-stream 32))
-  ([len] (->ByteOutputStream (js/Uint8Array. len) 0)))
+  ([len] (->ByteOutputStream (make-byte-array len) 0)))
 
 (deftype ByteInputStream [^:mutable stream ^:mutable cnt]
   p/ReadStream

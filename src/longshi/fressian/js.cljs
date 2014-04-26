@@ -62,7 +62,7 @@
                         (<= ch 0x007f) 1
                         (> ch 0x07ff) 3
                           :else 2)]
-      (if (and (< str-pos (.-length s)) (<= (+ buf-pos ch-enc-size) (.-length buffer)))
+      (if (and (< str-pos (alength s)) (<= (+ buf-pos ch-enc-size) (alength buffer)))
         (do
           (case ch-enc-size
             1 (aset buffer buf-pos ch)
@@ -81,7 +81,7 @@
   (write-null! [bos] (bsp/write! bos (.-NULL codes)))
   (write-boolean! [bos b] (bsp/write! bos (if b (.-TRUE codes) (.-FALSE codes))))
   (write-string! [bos s]
-    (let [max-bytes (Math/min (* (.-length s) 3) 65536)
+    (let [max-bytes (Math/min (* (alength s) 3) 65536)
           sba (make-byte-array max-bytes)]
       (loop [str-pos 0]
         (let [sa (string-chunk-utf8! s str-pos sba)
@@ -89,7 +89,7 @@
               buf-pos (aget sa 1)]
           (cond
             (< buf-pos (.-STRING_PACKED_LENGTH_END ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START codes) buf-pos))
-            (= new-str-pos (.-length s))
+            (= new-str-pos (alength s))
               (do
                 (bsp/write! bos (.-STRING codes))
                 (p/write-int! bos buf-pos))
@@ -98,7 +98,7 @@
                 (bsp/write! bos (.-STRING_CHUNK codes))
                 (p/write-int! bos buf-pos)))
           (bsp/write-bytes! bos sba 0 buf-pos)
-          (if (< new-str-pos (.-length s))
+          (if (< new-str-pos (alength s))
             (recur new-str-pos))))))
   (write-int! [bos i]
     (p/write-long! bos (Long.fromNumber i)))

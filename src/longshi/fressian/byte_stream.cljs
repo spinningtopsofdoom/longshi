@@ -6,7 +6,7 @@
   bsp/WriteStream
   (write! [bos b]
     (let [new-count (inc cnt)]
-      (if (< (.-length stream) new-count)
+      (if (< (alength stream) new-count)
         (let [new-stream (make-byte-array (max new-count (bit-shift-left cnt 1)))]
           (.set new-stream stream)
           (set! stream new-stream)))
@@ -14,7 +14,7 @@
       (set! cnt new-count)))
   (write-bytes! [bos b off len]
     (let [new-count (+ cnt len)]
-      (if (< (.-length stream) new-count)
+      (if (< (alength stream) new-count)
         (let [new-stream (make-byte-array (max new-count (bit-shift-left cnt 1)))]
           (.set new-stream stream)
           (set! stream new-stream)))
@@ -40,24 +40,24 @@
   bsp/ReadStream
   (read! [bis]
     (let [old-count cnt]
-      (if (< (.-length stream) cnt)
+      (if (< (alength stream) cnt)
         (throw (js/Error. "Can not read (1) bytes, Input Stream only has (0) bytes available")))
       (set! cnt (inc cnt))
       (aget stream old-count)))
   (read-bytes! [bis b off len]
     (let [old-count cnt]
-      (if (< (.-length stream) (+ cnt len off))
+      (if (< (alength stream) (+ cnt len off))
         (throw (js/Error. (str "Can not read (" len ") bytes at offset (" off "), Input Stream only has (" (bsp/available bis)") bytes available"))))
       (set! cnt (+ cnt off len))
       (.set b (.subarray stream (+ old-count off) (+ old-count off len)))))
-  (available [bis] (max 0 (- (.-length stream) cnt)))
+  (available [bis] (max 0 (- (alength stream) cnt)))
   bsp/SeekStream
   (seek! [bis pos]
-      (if (< (.-length stream) pos)
-        (throw (js/Error. (str "Tried to seek to (" pos ").  Stream is of size (" (.-length stream) ")"))))
+      (if (< (alength stream) pos)
+        (throw (js/Error. (str "Tried to seek to (" pos ").  Stream is of size (" (alength stream) ")"))))
        (set! cnt pos))
   ICounted
-  (-count [bis] (.-length stream)))
+  (-count [bis] (alength stream)))
 
 (defn byte-input-stream [stream]
   (->ByteInputStream stream 0))

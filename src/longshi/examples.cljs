@@ -1,5 +1,6 @@
 (ns longshi.examples
   (:import [goog.math Long])
+  (:use-macros [longshi.macros :only [make-byte-array]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]
@@ -79,4 +80,16 @@
         ro (vector (p/read-object! bis)
                    (p/read-object! bis)
                    (p/read-object! bis))]
+    (println ro)))
+
+(defn ta->seq [ta] (IndexedSeq. ta 0))
+;;Encoding / decoding bytes
+(let [bos (bs/byte-output-stream 2)]
+  (p/write-bytes! bos (make-byte-array 2))
+  (p/write-bytes! bos (make-byte-array 10))
+  (p/write-bytes! bos (make-byte-array 30))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (map #(ta->seq %) (vector (p/read-object! bis)
+                                     (p/read-object! bis)
+                                     (p/read-object! bis)))]
     (println ro)))

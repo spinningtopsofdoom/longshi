@@ -23,11 +23,16 @@
        :STRING 0xE3
        :STRING_PACKED_LENGTH_START 0xDA
        :STRING_CHUNK 0xE2
+       :BYTES_CHUNK 0xD8
+       :BYTES 0xD9
+       :BYTES_PACKED_LENGTH_START 0xD0
        })
 
 (def ranges
   #js {
        :STRING_PACKED_LENGTH_END 8
+       :BYTES_PACKED_LENGTH_END 8
+       :BYTE_CHUNK_SIZE 65535
        })
 
 (def ^:private little-endian false)
@@ -100,6 +105,22 @@
           (bsp/write-bytes! bos sba 0 buf-pos)
           (if (< new-str-pos (alength s))
             (recur new-str-pos))))))
+  (write-bytes! [bos b]
+    (if (< (alength b) (.-BYTES_PACKED_LENGTH_END ranges))
+      (do
+        (bsp/write! bos (+ (alength b) (.-BYTES_PACKED_LENGTH_START codes)))
+        (bsp/write-bytes! bos b 0 (alength b)))
+      (loop [offset 0 length (alength b)]
+        (if (> length (.-BYTE_CHUNK_SIZE ranges))
+          (do
+            (bsp/write! bos (.-BYTES_CHUNK codes))
+            (p/write-int! bos (.-BYTE_CHUNK_SIZE ranges))
+            (bsp/write-bytes! bos b offset (.-BYTE_CHUNK_SIZE ranges))
+            (recur (+ offset (.-BYTE_CHUNK_SIZE ranges)) (- length (.-BYTE_CHUNK_SIZE ranges))))
+          (do
+            (bsp/write! bos (.-BYTES codes))
+            (p/write-int! bos length)
+            (bsp/write-bytes! bos b offset length))))))
   (write-int! [bos i]
     (p/write-long! bos (Long.fromNumber i)))
   (write-long! [bos l]
@@ -307,6 +328,46 @@
                   (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
             (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
             (.join chunk-string-buffer "")))
+        ((.-BYTES codes))
+        (let [length (p/read-object! bis)
+              ba (make-byte-array length)]
+          (do
+            (bsp/read-bytes! bis ba 0 length)
+            ba))
+        (0xD0 0xD1 0xD2 0xD3 0xD4 0xD5 0xD6 0xD7)
+        (let [length (- code (.-BYTES_PACKED_LENGTH_START codes))
+              ba (make-byte-array length)]
+          (do
+            (bsp/read-bytes! bis ba 0 length)
+            ba))
+        ((.-BYTES_CHUNK codes))
+        (let [chunks (array)
+              byte-code (local code)]
+          (do
+            (while (= (get-local byte-code) (.-BYTES_CHUNK codes))
+              (let [length (p/read-object! bis)
+                    ba (make-byte-array length)]
+                (do
+                  (bsp/read-bytes! bis ba 0 length)
+                  (.push chunks ba)
+                  (set-local byte-code (bsp/read! bis))
+                  )))
+            (if (not= (get-local byte-code) (.-BYTES codes))
+              (throw (js/Error. (str "conclusion of chunked bytes (" (get-local byte-code) ")"))))
+            (let [length (p/read-object! bis)
+                  ba (make-byte-array length)]
+              (do
+                (bsp/read-bytes! bis ba 0 length)
+                (.push chunks ba)))
+            (let [chunk-seq (seq chunks)
+                  length (reduce #(+ %1 (alength %2)) 0 chunk-seq)
+                  ba (make-byte-array length)
+                  pos (local 0)]
+               (do
+                 (doseq [chunk chunk-seq]
+                   (.set ba chunk (get-local pos))
+                   (set-local pos (alength chunk)))
+                 ba))))
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
         ((.-DOUBLE codes)) (p/read-double! bis)))))

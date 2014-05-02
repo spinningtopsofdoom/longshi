@@ -1,8 +1,9 @@
 (ns longshi.fressian.js
   (:import [goog.math Long])
-  (:use-macros [longshi.macros :only [local set-local get-local make-byte-array make-data-view]])
+  (:use-macros [longshi.macros :only [local set-local get-local]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
+            [longshi.fressian.utils :refer [make-byte-array make-data-view]]
             [longshi.fressian.byte-stream :as bs]))
 
 (def codes

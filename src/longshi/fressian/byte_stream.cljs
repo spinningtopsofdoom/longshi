@@ -1,6 +1,6 @@
 (ns longshi.fressian.byte-stream
-  (:use-macros [longshi.macros :only [make-byte-array make-data-view]])
-  (:require [longshi.fressian.byte-stream-protocols :as bsp]))
+  (:require [longshi.fressian.byte-stream-protocols :as bsp]
+            [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
 (deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
   bsp/WriteStream

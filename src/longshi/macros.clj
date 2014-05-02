@@ -11,9 +11,3 @@
 
 (defmacro get-local [x]
   `(aget ~x 0))
-
-(defmacro make-byte-array [n]
-  `(js/Uint8Array. ~n))
-
-(defmacro make-data-view [ba]
-  `(js/DataView. (.-buffer ~ba)))

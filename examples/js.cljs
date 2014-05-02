@@ -1,4 +1,4 @@
-(ns longshi.examples
+(ns examples.js
   (:import [goog.math Long])
   (:use-macros [longshi.macros :only [make-byte-array]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]

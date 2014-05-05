@@ -1,9 +1,9 @@
 (ns examples.js
   (:import [goog.math Long])
-  (:use-macros [longshi.macros :only [make-byte-array]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]
+            [longshi.fressian.utils :refer [make-byte-array]]
             [longshi.fressian.js :as bjs]))
 
 (enable-console-print!)

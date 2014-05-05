@@ -1,5 +1,6 @@
 (ns longshi.fressian.js
-  (:import [goog.math Long])
+  (:import [goog.math Long]
+           [goog.string StringBuffer])
   (:use-macros [longshi.macros :only [local set-local get-local]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
@@ -52,7 +53,7 @@
 ;;Integer helpers
 (defn bit-switch [x]
   (cond
-    (or (.equals Long/ONE x) (.equals Long.NEG_ONE x)) 64
+    (or (.equals Long.ONE x) (.equals Long.NEG_ONE x)) 64
     :else
     (if (neg? x)
       (- 64 (.getNumBitsAbs (.not x)))
@@ -189,21 +190,29 @@
       (case (bit-shift-right ch 4)
         (0 1 2 3 4 5 6 7)
         (do
-          (.push dest ch)
+          (.append dest (.fromCharCode js/String ch))
           (recur (inc pos)))
         (12 13)
         (let [ch1 (aget source (inc pos))]
           (do
-            (.push dest (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
+            (.append
+              dest
+              (.fromCharCode
+                js/String
+                (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6))))
             (recur (+ 2 pos))))
         (14)
         (let [ch1 (aget source (inc pos))
               ch2 (aget source (+ 2 pos))]
           (do
-            (.push dest (bit-or
-                          (bit-and ch2 0x3f)
-                          (bit-shift-left (bit-and ch1 0x3f) 6)
-                          (bit-shift-left (bit-and ch 0x0f) 12)))
+            (.append
+              dest
+              (.fromCharCode
+                js/String
+                (bit-or
+                  (bit-and ch2 0x3f)
+                  (bit-shift-left (bit-and ch1 0x3f) 6)
+                  (bit-shift-left (bit-and ch 0x0f) 12))))
             (recur (+ 3 pos))))
         (throw (js/Error. (str "Invalid UTF Character (" ch ")")))))))
 
@@ -299,36 +308,32 @@
             (Long. il32 ih32)
             (+ (* ih32 two-power-32) il32)))
         ((.-STRING codes))
-        (let [string-buffer (array)]
+        (let [string-buffer (StringBuffer.)]
           (do
             (read-string-buffer! bis string-buffer (p/read-object! bis))
-            (apply String/fromCharCode string-buffer)))
+            (.toString string-buffer)))
         (0xDA 0xDB 0xDC 0xDD 0xDE 0xDF 0xE0 0xE1)
-        (let [string-buffer (array)]
+        (let [string-buffer (StringBuffer.)]
           (do
             (read-string-buffer! bis string-buffer (- code (.-STRING_PACKED_LENGTH_START codes)))
-            (apply String/fromCharCode string-buffer)))
+            (.toString string-buffer)))
         ((.-STRING_CHUNK codes))
-        (let [chunk-string-buffer (array)
-              string-buffer (local (array))]
+        (let [string-buffer (StringBuffer.)]
           (do
-            (read-string-buffer! bis (aget string-buffer 0) (p/read-object! bis))
+            (read-string-buffer! bis string-buffer (p/read-object! bis))
             (loop []
-              (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
-              (set-local string-buffer (array))
               (let [next-code (bsp/read! bis)]
                 (case next-code
                   ((.-STRING codes))
-                  (read-string-buffer! bis (get-local string-buffer) (p/read-object! bis))
+                  (read-string-buffer! bis string-buffer (p/read-object! bis))
                   (0xDA 0xDB 0xDC 0xDD 0xDE 0xDF 0xE0 0xE1)
-                  (read-string-buffer! bis (get-local string-buffer) (- next-code (.-STRING_PACKED_LENGTH_START codes)))
+                  (read-string-buffer! bis string-buffer (- next-code (.-STRING_PACKED_LENGTH_START codes)))
                   ((.-STRING_CHUNK codes))
                     (do
-                      (read-string-buffer! bis (get-local string-buffer) (p/read-object! bis))
+                      (read-string-buffer! bis string-buffer (p/read-object! bis))
                       (recur))
                   (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
-            (.push chunk-string-buffer (apply String/fromCharCode (get-local string-buffer)))
-            (.join chunk-string-buffer "")))
+            (.toString string-buffer)))
         ((.-BYTES codes))
         (let [length (p/read-object! bis)
               ba (make-byte-array length)]

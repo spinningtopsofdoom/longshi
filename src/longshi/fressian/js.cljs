@@ -1,7 +1,6 @@
 (ns longshi.fressian.js
   (:import [goog.math Long]
            [goog.string StringBuffer])
-  (:use-macros [longshi.macros :only [local set-local get-local]])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]
@@ -347,32 +346,32 @@
             (bsp/read-bytes! bis ba 0 length)
             ba))
         ((.-BYTES_CHUNK codes))
-        (let [chunks (array)
-              byte-code (local code)]
+        (let [chunks (array)]
           (do
-            (while (= (get-local byte-code) (.-BYTES_CHUNK codes))
-              (let [length (p/read-object! bis)
-                    ba (make-byte-array length)]
-                (do
-                  (bsp/read-bytes! bis ba 0 length)
-                  (.push chunks ba)
-                  (set-local byte-code (bsp/read! bis))
-                  )))
-            (if (not= (get-local byte-code) (.-BYTES codes))
-              (throw (js/Error. (str "conclusion of chunked bytes (" (get-local byte-code) ")"))))
-            (let [length (p/read-object! bis)
+            (loop [code code]
+              (cond
+                (== code (.-BYTES_CHUNK codes))
+                (let [length (p/read-object! bis)
+                      ba (make-byte-array length)]
+                  (do
+                    (bsp/read-bytes! bis ba 0 length)
+                    (.push chunks ba)
+                    (recur (bsp/read! bis))))
+                (== code (.-BYTES codes))
+                (let [length (p/read-object! bis)
+                      ba (make-byte-array length)]
+                  (do
+                    (bsp/read-bytes! bis ba 0 length)
+                    (.push chunks ba)))
+                :else
+                (throw (js/Error. (str "conclusion of chunked bytes (" code ")")))))
+            (let [length (reduce #(+ %1 (alength %2)) 0 (seq chunks))
                   ba (make-byte-array length)]
-              (do
-                (bsp/read-bytes! bis ba 0 length)
-                (.push chunks ba)))
-            (let [chunk-seq (seq chunks)
-                  length (reduce #(+ %1 (alength %2)) 0 chunk-seq)
-                  ba (make-byte-array length)
-                  pos (local 0)]
                (do
-                 (doseq [chunk chunk-seq]
-                   (.set ba chunk (get-local pos))
-                   (set-local pos (alength chunk)))
+                 (loop [pos 0 chunk 0]
+                   (when (< chunk (alength chunks))
+                     (.set ba (aget chunks chunk) pos)
+                     (recur (+ pos (alength (aget chunks chunk))) (inc chunk))))
                  ba))))
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0

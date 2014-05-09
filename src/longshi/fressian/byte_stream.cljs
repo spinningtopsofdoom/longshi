@@ -2,6 +2,25 @@
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
+(defn adler32
+  ([ba] (adler32 ba 1))
+  ([ba adler]
+    (let [ba-len (.-length ba)
+          sums (js/Uint32Array. 2)]
+      (do
+        (aset sums (bit-and adler 0xffff) 0)
+        (aset sums (bit-and (unsigned-bit-shift-right adler 16) 0xffff) 1)
+        (loop [i 0]
+          (when (< i ba-len)
+            (do
+              (aset sums 0 (+ (aget ba i) (aget sums 0)))
+              (aset sums 1 (+ (aget sums 0) (aget sums 1)))
+              (recur (inc i))
+              )))
+        (aset sums 0 (js-mod (aget sums 0) 65521))
+        (aset sums 1 (js-mod (aget sums 1) 65521))
+        (unsigned-bit-shift-right (bit-or (bit-shift-left (aget sums 1) 16) (aget sums 0)) 0)))))
+
 (deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
   bsp/WriteStream
   (write! [bos b]

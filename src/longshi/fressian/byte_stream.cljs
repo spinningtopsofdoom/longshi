@@ -5,18 +5,22 @@
 (defn adler32
   ([ba] (adler32 ba 1))
   ([ba adler]
-    (let [ba-len (.-length ba)
+    (let [ba-len (alength ba)
           sums (js/Uint32Array. 2)]
       (do
         (aset sums (bit-and adler 0xffff) 0)
         (aset sums (bit-and (unsigned-bit-shift-right adler 16) 0xffff) 1)
-        (loop [i 0]
+        (loop [i 0 adler-chunk 0]
           (when (< i ba-len)
             (do
               (aset sums 0 (+ (aget ba i) (aget sums 0)))
               (aset sums 1 (+ (aget sums 0) (aget sums 1)))
-              (recur (inc i))
-              )))
+              (if (== adler-chunk 5552)
+                (do
+                  (aset sums 0 (js-mod (aget sums 0) 65521))
+                  (aset sums 1 (js-mod (aget sums 1) 65521))
+                  (recur (inc i) 0))
+                (recur (inc i) (inc adler-chunk))))))
         (aset sums 0 (js-mod (aget sums 0) 65521))
         (aset sums 1 (js-mod (aget sums 1) 65521))
         (unsigned-bit-shift-right (bit-or (bit-shift-left (aget sums 1) 16) (aget sums 0)) 0)))))

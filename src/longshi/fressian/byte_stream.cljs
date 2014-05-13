@@ -25,6 +25,10 @@
         (aset sums 1 (js-mod (aget sums 1) 65521))
         (unsigned-bit-shift-right (bit-or (bit-shift-left (aget sums 1) 16) (aget sums 0)) 0)))))
 
+(def ^:private little-endian false)
+;;Integer buffer
+(def ^:private i32a (make-byte-array 4))
+(def ^:private i32adv (make-data-view i32a))
 (deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
   bsp/WriteStream
   (write! [bos b]
@@ -47,6 +51,31 @@
      (let [new-stream (make-byte-array cnt)]
        (.set new-stream (.subarray stream 0 cnt))
        new-stream))
+  bsp/IntegerWriteStream
+  (write-int16! [bos i16]
+    (do
+      (.setInt16 i32adv 0 i16 little-endian)
+      (bsp/write-bytes! bos i32a 0 2)))
+  (write-int24! [bos i24]
+    (do
+      (.setInt32 i32adv 0 i24 little-endian)
+      (bsp/write-bytes! bos i32a 0 3)))
+  (write-int32! [bos i32]
+    (do
+      (.setInt32 i32adv 0 i32 little-endian)
+      (bsp/write-bytes! bos i32a 0 4)))
+  (write-unsigned-int16! [bos ui16]
+    (do
+      (.setUint16 i32adv 0 ui16 little-endian)
+      (bsp/write-bytes! bos i32a 0 2)))
+  (write-unsigned-int24! [bos ui24]
+    (do
+      (.setUint32 i32adv 0 ui24 little-endian)
+      (bsp/write-bytes! bos i32a 0 3)))
+  (write-unsigned-int32! [bos ui32]
+    (do
+      (.setUint32 i32adv 0 ui32 little-endian)
+      (bsp/write-bytes! bos i32a 0 4)))
   bsp/SeekStream
   (seek! [bos pos]
       (if (< cnt pos)
@@ -74,6 +103,31 @@
       (set! cnt (+ cnt off len))
       (.set b (.subarray stream (+ old-count off) (+ old-count off len)))))
   (available [bis] (max 0 (- (alength stream) cnt)))
+  bsp/IntegerReadStream
+  (read-int16! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 2)
+      (.getInt16 i32adv 0 little-endian)))
+  (read-int24! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 3)
+      (.getInt32 i32adv 0 little-endian)))
+  (read-int32! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 4)
+      (.getInt32 i32adv 0 little-endian)))
+  (read-unsigned-int16! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 2)
+      (.getUint16 i32adv 0 little-endian)))
+  (read-unsigned-int24! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 3)
+      (.getUint32 i32adv 0 little-endian)))
+  (read-unsigned-int32! [bis]
+    (do
+      (bsp/read-bytes! bis i32a 0 4)
+      (.getUint32 i32adv 0 little-endian)))
   bsp/SeekStream
   (seek! [bis pos]
       (if (< (alength stream) pos)

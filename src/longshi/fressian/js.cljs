@@ -46,9 +46,6 @@
 (def ^:private two-power-16 (bit-shift-left 1 16))
 (def ^:private two-power-24 (bit-shift-left 1 24))
 (def ^:private two-power-32 (* two-power-16 two-power-16))
-;;Integer buffer
-(def ^:private i64a (make-byte-array 8))
-(def ^:private i64adv (make-data-view i64a))
 ;;Integer helpers
 (defn bit-switch [x]
   (cond
@@ -132,38 +129,32 @@
         (1 2 3 4 5 6 7 8 9 10 11 12 13 14)
         (do
           (bsp/write! bos (.-INT codes))
-          (.setInt32 i64adv 0 hb)
-          (.setInt32 i64adv 4 lb little-endian)
-          (bsp/write-bytes! bos i64a 0 8))
+          (bsp/write-int32! bos hb)
+          (bsp/write-int32! bos lb))
         (15 16 17 18 19 20 21 22)
         (let [ic (bit-shift-right hb 16)]
           (do
             (bsp/write! bos (+ (.-INT_PACKED_7_ZERO codes) ic))
-            (.setInt16 i64adv 0 hb)
-            (.setInt32 i64adv 2 lb little-endian)
-            (bsp/write-bytes! bos i64a 0 6)))
+            (bsp/write-int16! bos hb)
+            (bsp/write-int32! bos lb)))
         (23 24 25 26 27 28 29 30)
         (let [ic (bit-shift-right hb 8)]
           (do
             (bsp/write! bos (+ (.-INT_PACKED_6_ZERO codes) ic))
-            (.setInt8 i64adv 0 hb)
-            (.setInt32 i64adv 1 lb little-endian)
-            (bsp/write-bytes! bos i64a 0 5)))
+            (bsp/write! bos hb)
+            (bsp/write-int32! bos lb)))
         (31 32 33 34 35 36 37 38)
         (do
           (bsp/write! bos (+ (.-INT_PACKED_5_ZERO codes) hb))
-          (.setInt32 i64adv 0 lb little-endian)
-          (bsp/write-bytes! bos i64a 0 4))
+          (bsp/write-int32! bos lb))
         (39 40 41 42 43 44)
         (do
           (bsp/write! bos (+ (.-INT_PACKED_4_ZERO codes) (bit-shift-right lb 24)))
-          (.setInt32 i64adv 0 lb little-endian)
-          (bsp/write-bytes! bos i64a 0 3))
+          (bsp/write-int24! bos lb))
         (45 46 47 48 49 50 51)
         (do
           (bsp/write! bos (+ (.-INT_PACKED_3_ZERO codes) (bit-shift-right lb 16)))
-          (.setInt16 i64adv 0 lb little-endian)
-          (bsp/write-bytes! bos i64a 0 2))
+          (bsp/write-int16! bos lb))
         (52 53 54 55 56 57)
         (do
           (bsp/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8)))
@@ -253,20 +244,13 @@
          0x68 0x69 0x6A 0x6B 0x6C 0x6D 0x6E 0x6F)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_3_ZERO codes)) 16)
-          (do
-            (bsp/read-bytes! bis i64a 0 2)
-            (.getUint16 i64adv 0 little-endian)))
+          (bsp/read-unsigned-int16! bis))
         (0x70 0x71 0x72 0x73)
         (bit-or
           (bit-shift-left (- code (.-INT_PACKED_4_ZERO codes)) 24)
-          (do
-            (bsp/read-bytes! bis i64a 0 3)
-            (aset i64a 3 0)
-            (.getUint32 i64adv 0 little-endian)))
+          (bsp/read-unsigned-int24! bis))
         (0x74 0x75 0x76 0x77)
-        (let [i32 (do
-                    (bsp/read-bytes! bis i64a 0 4)
-                    (.getUint32 i64adv 0 little-endian))]
+        (let [i32 (bsp/read-unsigned-int32! bis)]
           (case code
             0x74 (+ i32 (* -2 two-power-32))
             0x75 (+ i32 (* -1 two-power-32))
@@ -274,9 +258,7 @@
             0x77 (+ i32 two-power-32)))
         (0x78 0x79 0x7A 0x7B)
         (let [ih8 (bsp/read! bis)
-              il32 (do
-                    (bsp/read-bytes! bis i64a 0 4)
-                    (.getUint32 i64adv 0 little-endian))
+              il32 (bsp/read-unsigned-int32! bis)
               i40 (+ (* ih8 two-power-32) il32)]
           (case code
             0x78 (+ i40 (* -512 two-power-32))
@@ -284,12 +266,8 @@
             0x7A i40
             0x7B (+ i40 (* 256 two-power-32))))
         (0x7C 0x7D 0x7E 0x7F)
-        (let [ih16 (do
-                    (bsp/read-bytes! bis i64a 0 2)
-                    (.getUint16 i64adv 0 little-endian))
-              il32 (do
-                    (bsp/read-bytes! bis i64a 0 4)
-                    (.getUint32 i64adv 0 little-endian))
+        (let [ih16 (bsp/read-unsigned-int16! bis)
+              il32 (bsp/read-unsigned-int32! bis)
               i48 (+ (* ih16 two-power-32) il32)]
           (case code
             0x7C (+ i48 (* -2 two-power-16 two-power-32))
@@ -297,12 +275,8 @@
             0x7E i48
             0x7F (+ i48 (* two-power-16 two-power-32))))
         ((.-INT codes))
-        (let [ih32 (do
-                    (bsp/read-bytes! bis i64a 0 4)
-                    (.getInt32 i64adv 0 little-endian))
-              il32 (do
-                    (bsp/read-bytes! bis i64a 0 4)
-                    (.getUint32 i64adv 0 little-endian))]
+        (let [ih32 (bsp/read-int32! bis)
+              il32 (bsp/read-unsigned-int32! bis)]
           (if (or (> ih32 max-pos-js-hb-int) (< ih32 max-neg-js-hb-int))
             (Long. il32 ih32)
             (+ (* ih32 two-power-32) il32)))

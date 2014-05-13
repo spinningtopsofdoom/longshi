@@ -150,7 +150,7 @@
   (read-double! [bis]
     (do
       (bsp/read-bytes! bis da 0 8)
-      (.getFloat64 dadv 0 d little-endian)))
+      (.getFloat64 dadv 0 little-endian)))
   bsp/SeekStream
   (seek! [bis pos]
       (if (< (alength stream) pos)

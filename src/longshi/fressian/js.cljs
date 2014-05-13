@@ -214,9 +214,16 @@
 (extend-type bs/ByteInputStream
   p/FressianReader
   (read-float! [bis]
-    (bsp/read-float! bis))
+    (let [code (bsp/read! bis)]
+      (case code
+        ((.-FLOAT codes)) (bsp/read-float! bis)
+      (throw (js/Error. (str "Expected float got (" code ")"))))))
   (read-double! [bis]
-    (bsp/read-double! bis))
+    (let [code (bsp/read! bis)]
+      (case code
+        ((.-DOUBLE_0 codes)) 0.0
+        ((.-DOUBLE_1 codes)) 1.0
+        ((.-DOUBLE codes)) (bsp/read-double! bis))))
   (read-int! [bis]
     (let [code (bsp/read! bis)]
       (case code

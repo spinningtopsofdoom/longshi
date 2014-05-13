@@ -11,6 +11,7 @@
   (write-bytes! [fw b]))
 
 (defprotocol FressianReader
+  (read-boolean! [fr])
   (read-float! [fr])
   (read-double! [fr])
   (read-int! [fr])

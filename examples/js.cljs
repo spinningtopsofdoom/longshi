@@ -18,8 +18,8 @@
   (p/write-boolean! bos true)
   (p/write-boolean! bos false)
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
-        ro (vector (p/read-object! bis)
-                   (p/read-object! bis))]
+        ro (vector (p/read-boolean! bis)
+                   (p/read-boolean! bis))]
     (println ro)))
 ;;Encoding / decoding floats
 (let [bos (bs/byte-output-stream 2)]

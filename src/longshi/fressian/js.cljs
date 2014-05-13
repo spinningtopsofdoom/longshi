@@ -213,6 +213,12 @@
 
 (extend-type bs/ByteInputStream
   p/FressianReader
+  (read-boolean! [bis]
+    (let [code (bsp/read! bis)]
+      (case code
+        ((.-TRUE codes)) true
+        ((.-FALSE codes)) false
+      (throw (js/Error. (str "Expected boolean got (" code ")"))))))
   (read-float! [bis]
     (let [code (bsp/read! bis)]
       (case code

@@ -28,10 +28,10 @@
   (p/write-float! bos -1234.5)
   (p/write-float! bos 1234.5)
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
-        ro (vector (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis))]
+        ro (vector (p/read-float! bis)
+                   (p/read-float! bis)
+                   (p/read-float! bis)
+                   (p/read-float! bis))]
     (println ro)))
 ;;Encoding / decoding doubles
 (let [bos (bs/byte-output-stream 2)]
@@ -39,9 +39,9 @@
   (p/write-double! bos 1.0)
   (p/write-double! bos 1234.56789)
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
-        ro (vector (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis))]
+        ro (vector (p/read-double! bis)
+                   (p/read-double! bis)
+                   (p/read-double! bis))]
     (println ro)))
 ;;Encoding / decoding integers
 (let [bos (bs/byte-output-stream 2)]
@@ -60,28 +60,28 @@
   (p/write-int! bos -562949953421312)
   (p/write-int! bos -9007199254740991)
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
-        ro (vector (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis)
-                   (p/read-object! bis))]
+        ro (vector (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis)
+                   (p/read-int! bis))]
     (println ro)))
 ;;Encoding / decoding longs
 (let [bos (bs/byte-output-stream 2)]
   (p/write-long! bos (Long.fromString "9223372036854775807"))
   (p/write-long! bos (Long.fromString "-9223372036854775808"))
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
-        ro (vector (p/read-object! bis)
-                   (p/read-object! bis))]
+        ro (vector (p/read-int! bis)
+                   (p/read-int! bis))]
     (println ro)))
 ;;Encoding / decoding strings
 (let [bos (bs/byte-output-stream 2)]

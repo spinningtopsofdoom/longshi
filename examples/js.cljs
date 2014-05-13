@@ -21,6 +21,18 @@
         ro (vector (p/read-object! bis)
                    (p/read-object! bis))]
     (println ro)))
+;;Encoding / decoding floats
+(let [bos (bs/byte-output-stream 2)]
+  (p/write-float! bos -14.5)
+  (p/write-float! bos 30.5)
+  (p/write-float! bos -1234.5)
+  (p/write-float! bos 1234.5)
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector (p/read-object! bis)
+                   (p/read-object! bis)
+                   (p/read-object! bis)
+                   (p/read-object! bis))]
+    (println ro)))
 ;;Encoding / decoding doubles
 (let [bos (bs/byte-output-stream 2)]
   (p/write-double! bos 0.0)

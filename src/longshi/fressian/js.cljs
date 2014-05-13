@@ -11,6 +11,7 @@
        :NULL 0xF7
        :TRUE 0xF5
        :FALSE 0xF6
+       :FLOAT 0xF9
        :DOUBLE 0xFA
        :DOUBLE_0 0xFB
        :DOUBLE_1 0xFC
@@ -160,6 +161,10 @@
             (bsp/write! bos (+ (.-INT_PACKED_2_ZERO codes) (bit-shift-right lb 8))))
           (bsp/write! bos lb))
         (throw (js/Error. (str "Long (" l ") can not be converted"))))))
+  (write-float! [bos f]
+    (do
+      (bsp/write! bos (.-FLOAT codes))
+      (bsp/write-float! bos f)))
   (write-double! [bos d]
     (case d
       0.0 (bsp/write! bos (.-DOUBLE_0 codes))
@@ -208,6 +213,8 @@
 
 (extend-type bs/ByteInputStream
   p/FressianReader
+  (read-float! [bis]
+    (bsp/read-float! bis))
   (read-double! [bis]
     (bsp/read-double! bis))
   (read-object! [bis]
@@ -340,6 +347,7 @@
                      (.set ba (aget chunks chunk) pos)
                      (recur (+ pos (alength (aget chunks chunk))) (inc chunk))))
                  ba))))
+        ((.-FLOAT codes)) (bsp/read-float! bis)
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
         ((.-DOUBLE codes)) (bsp/read-double! bis)))))

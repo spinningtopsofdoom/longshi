@@ -16,6 +16,12 @@
   (write-unsigned-int24! [iws ui24])
   (write-unsigned-int32! [iws ui32]))
 
+(defprotocol FloatWriteStream
+  (write-float! [fws f]))
+
+(defprotocol DoubleWriteStream
+  (write-double! [dws d]))
+
 (defprotocol ReadStream
   (read! [rs])
   (read-bytes! [rs b off len])
@@ -28,3 +34,9 @@
   (read-unsigned-int16! [irs])
   (read-unsigned-int24! [irs])
   (read-unsigned-int32! [irs]))
+
+(defprotocol FloatReadStream
+  (read-float! [frs]))
+
+(defprotocol DoubleReadStream
+  (read-double! [drs]))

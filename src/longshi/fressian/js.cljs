@@ -35,11 +35,6 @@
        :BYTES_PACKED_LENGTH_END 8
        :BYTE_CHUNK_SIZE 65535
        })
-
-(def ^:private little-endian false)
-;;Double buffer
-(def ^:private da (make-byte-array 8))
-(def ^:private dadv (make-data-view da))
 ;;Integer constants
 (def ^:private max-neg-js-hb-int (bit-shift-left -1 21))
 (def ^:private max-pos-js-hb-int (dec (bit-shift-left 1 21)))
@@ -171,8 +166,7 @@
       1.0 (bsp/write! bos (.-DOUBLE_1 codes))
       (do
         (bsp/write! bos (.-DOUBLE codes))
-        (.setFloat64 dadv 0 d little-endian)
-        (bsp/write-bytes! bos da 0 8)))))
+        (bsp/write-double! bos d)))))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]
@@ -215,8 +209,7 @@
 (extend-type bs/ByteInputStream
   p/FressianReader
   (read-double! [bis]
-     (bsp/read-bytes! bis da 0 8)
-     (.getFloat64 dadv 0 little-endian))
+    (bsp/read-double! bis))
   (read-object! [bis]
     (let [code (bsp/read! bis)]
       (case code
@@ -349,4 +342,4 @@
                  ba))))
         ((.-DOUBLE_0 codes)) 0.0
         ((.-DOUBLE_1 codes)) 1.0
-        ((.-DOUBLE codes)) (p/read-double! bis)))))
+        ((.-DOUBLE codes)) (bsp/read-double! bis)))))

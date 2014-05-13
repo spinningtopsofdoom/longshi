@@ -29,6 +29,9 @@
 ;;Integer buffer
 (def ^:private i32a (make-byte-array 4))
 (def ^:private i32adv (make-data-view i32a))
+;;Double buffer
+(def ^:private da (make-byte-array 8))
+(def ^:private dadv (make-data-view da))
 (deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
   bsp/WriteStream
   (write! [bos b]
@@ -76,6 +79,16 @@
     (do
       (.setUint32 i32adv 0 ui32 little-endian)
       (bsp/write-bytes! bos i32a 0 4)))
+  bsp/FloatWriteStream
+  (write-float! [bos f]
+    (do
+      (.setFloat32 dadv 0 f little-endian)
+      (bsp/write-bytes! bos da 0 4)))
+  bsp/DoubleWriteStream
+  (write-double! [bos d]
+    (do
+      (.setFloat64 dadv 0 d little-endian)
+      (bsp/write-bytes! bos da 0 8)))
   bsp/SeekStream
   (seek! [bos pos]
       (if (< cnt pos)
@@ -128,6 +141,16 @@
     (do
       (bsp/read-bytes! bis i32a 0 4)
       (.getUint32 i32adv 0 little-endian)))
+  bsp/FloatReadStream
+  (read-float! [bis]
+    (do
+      (bsp/read-bytes! bis da 0 4)
+      (.getFloat32 dadv 0 little-endian)))
+  bsp/DoubleReadStream
+  (read-double! [bis]
+    (do
+      (bsp/read-bytes! bis da 0 8)
+      (.getFloat64 dadv 0 d little-endian)))
   bsp/SeekStream
   (seek! [bis pos]
       (if (< (alength stream) pos)

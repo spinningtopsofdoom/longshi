@@ -13,4 +13,5 @@
 (defprotocol FressianReader
   (read-float! [fr])
   (read-double! [fr])
+  (read-int! [fr])
   (read-object! [fr]))

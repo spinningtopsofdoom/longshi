@@ -3,6 +3,7 @@
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.byte-stream :as bs]
+            [longshi.fressian.handlers :as fh]
             [longshi.fressian.utils :refer [make-byte-array]]
             [longshi.fressian.js :as bjs]))
 
@@ -105,3 +106,41 @@
                                      (p/read-object! bis)
                                      (p/read-object! bis)))]
     (println ro)))
+
+;;Encoding / decoding write handlers
+(let [bos (bs/byte-output-stream 2)
+      write-handlers (fh/write-lookup fh/core-write-handlers)]
+  (do
+    (let [x nil]
+      ((.require-write-handler write-handlers "null" x) bos x))
+    (let [x true]
+      ((.require-write-handler write-handlers "bool" x) bos x))
+    (let [x 42]
+      ((.require-write-handler write-handlers "int" x) bos x))
+    (let [x 3.14]
+      ((.require-write-handler write-handlers "double" x) bos x))
+    (let [x (Long. 1 1)]
+      ((.require-write-handler write-handlers "int" x) bos x))
+    (let [x "foobar"]
+      ((.require-write-handler write-handlers "string" x) bos x))
+    (let [x (js/Uint8Array. #js [-34 12 34])]
+      ((.require-write-handler write-handlers "bytes" x) bos x))
+    (let [x (js/Int8Array. #js [-34 12 34])]
+      ((.require-write-handler write-handlers "bytes" x) bos x))
+    (let [x 2.718]
+      ((.require-write-handler write-handlers nil x) bos x))
+    (let [x 1729]
+      ((.require-write-handler write-handlers nil x) bos x)))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (p/read-object! bis)
+            (p/read-object! bis))]
+  (println ro)))

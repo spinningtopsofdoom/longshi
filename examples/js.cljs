@@ -107,33 +107,44 @@
                                      (p/read-object! bis)))]
     (println ro)))
 
-;;Encoding / decoding write handlers
-(let [bos (bs/byte-output-stream 2)
-      write-handlers (fh/write-lookup fh/core-write-handlers)]
+;;Encoding / decoding write-as
+(let [bos (bs/byte-output-stream 2)]
   (do
-    (let [x nil]
-      ((.require-write-handler write-handlers "null" x) bos x))
-    (let [x true]
-      ((.require-write-handler write-handlers "bool" x) bos x))
-    (let [x 42]
-      ((.require-write-handler write-handlers "int" x) bos x))
-    (let [x 3.14]
-      ((.require-write-handler write-handlers "double" x) bos x))
-    (let [x (Long. 1 1)]
-      ((.require-write-handler write-handlers "int" x) bos x))
-    (let [x "foobar"]
-      ((.require-write-handler write-handlers "string" x) bos x))
-    (let [x (js/Uint8Array. #js [-34 12 34])]
-      ((.require-write-handler write-handlers "bytes" x) bos x))
-    (let [x (js/Int8Array. #js [-34 12 34])]
-      ((.require-write-handler write-handlers "bytes" x) bos x))
-    (let [x 2.718]
-      ((.require-write-handler write-handlers nil x) bos x))
-    (let [x 1729]
-      ((.require-write-handler write-handlers nil x) bos x)))
+    (p/write-as! bos "null" nil)
+    (p/write-as! bos "bool" true)
+    (p/write-as! bos "int" 42)
+    (p/write-as! bos "double" 3.14)
+    (p/write-as! bos "string" "foobar")
+    (p/write-as! bos "bytes" (js/Uint8Array. #js [-34 12 34]))
+    (p/write-as! bos "bytes" (js/Int8Array. #js [-34 12 34]))
+    (p/write-as! bos nil 2.718)
+    (p/write-as! bos nil 1729))
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
         ro (vector
             (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (p/read-object! bis)
+            (p/read-object! bis))]
+  (println ro)))
+;;Encoding / decoding write-object
+(let [bos (bs/byte-output-stream 2)]
+  (do
+    (p/write-object! bos nil)
+    (p/write-object! bos true)
+    (p/write-object! bos 42)
+    (p/write-object! bos 3.14)
+    (p/write-object! bos "foobar")
+    (p/write-object! bos (js/Uint8Array. #js [-34 12 34]))
+    (p/write-object! bos (js/Int8Array. #js [-34 12 34]))
+    (p/write-object! bos 2.718)
+    (p/write-object! bos 1729))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector
             (p/read-object! bis)
             (p/read-object! bis)
             (p/read-object! bis)

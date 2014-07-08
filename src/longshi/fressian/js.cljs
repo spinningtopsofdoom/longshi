@@ -142,7 +142,15 @@
       1.0 (bsp/write! bos (.-DOUBLE_1 c/codes))
       (do
         (bsp/write! bos (.-DOUBLE c/codes))
-        (bsp/write-double! bos d)))))
+        (bsp/write-double! bos d))))
+  (write-object! [bos o]
+    (p/write-object! bos o false))
+  (write-object! [bos o cache]
+    (p/write-as! bos nil o cache))
+  (write-as! [bos tag o]
+    (p/write-as! bos tag o false))
+  (write-as! [bos tag o cache]
+    ((.require-write-handler (.-handlers bos) tag o) bos o)))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]

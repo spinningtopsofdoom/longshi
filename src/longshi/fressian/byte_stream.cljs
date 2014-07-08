@@ -1,5 +1,6 @@
 (ns longshi.fressian.byte-stream
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
+            [longshi.fressian.handlers :as fh]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
 (defn adler32
@@ -32,7 +33,7 @@
 ;;Double buffer
 (def ^:private da (make-byte-array 8))
 (def ^:private dadv (make-data-view da))
-(deftype ByteOutputStream [^:mutable stream ^:mutable cnt]
+(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers]
   bsp/WriteStream
   (write! [bos b]
     (let [new-count (inc cnt)]
@@ -99,7 +100,7 @@
 
 (defn byte-output-stream
   ([] (byte-output-stream 32))
-  ([len] (->ByteOutputStream (make-byte-array len) 0)))
+  ([len] (->ByteOutputStream (make-byte-array len) 0 (fh/write-lookup fh/core-write-handlers))))
 
 (deftype ByteInputStream [^:mutable stream ^:mutable cnt]
   bsp/ReadStream

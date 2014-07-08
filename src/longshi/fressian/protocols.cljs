@@ -8,7 +8,9 @@
   (write-float! [fw d])
   (write-double! [fw d])
   (write-string! [fw s])
-  (write-bytes! [fw b]))
+  (write-bytes! [fw b])
+  (write-object! [fw o] [fw o cache])
+  (write-as! [fw tag o] [fw tag o cache]))
 
 (defprotocol FressianReader
   (read-boolean! [fr])

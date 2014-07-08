@@ -143,6 +143,10 @@
       (do
         (bsp/write! bos (.-DOUBLE c/codes))
         (bsp/write-double! bos d))))
+  (write-tag! [bos tag component-count]
+    (if-let [shortcut-code (aget c/tag-to-code tag)]
+      (bsp/write! bos shortcut-code)
+      (throw (js/Error. "Not Implemented Yet"))))
   (write-object! [bos o]
     (p/write-object! bos o false))
   (write-object! [bos o cache]
@@ -400,6 +404,18 @@
                      (.set ba (aget chunks chunk) pos)
                      (recur (+ pos (alength (aget chunks chunk))) (inc chunk))))
                  ba))))
+        ((.-BOOLEAN-ARRAY c/codes))
+        (.handle-struct bis "boolean[]" 2)
+        ((.-INT-ARRAY c/codes))
+        (.handle-struct bis "int[]" 2)
+        ((.-FLOAT-ARRAY c/codes))
+        (.handle-struct bis "float[]" 2)
+        ((.-DOUBLE-ARRAY c/codes))
+        (.handle-struct bis "double[]" 2)
+        ((.-LONG-ARRAY c/codes))
+        (.handle-struct bis "long[]" 2)
+        ((.-OBJECT-ARRAY c/codes))
+        (.handle-struct bis "Object[]" 2)
         ((.-FLOAT c/codes)) (bsp/read-float! bis)
         ((.-DOUBLE_0 c/codes)) 0.0
         ((.-DOUBLE_1 c/codes)) 1.0

@@ -1,5 +1,6 @@
 (ns longshi.fressian.byte-stream
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
+            [longshi.fressian.protocols :as p]
             [longshi.fressian.handlers :as fh]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
@@ -102,7 +103,17 @@
   ([] (byte-output-stream 32))
   ([len] (->ByteOutputStream (make-byte-array len) 0 (fh/write-lookup fh/core-write-handlers))))
 
-(deftype ByteInputStream [^:mutable stream ^:mutable cnt]
+(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers]
+  Object
+  (handle-struct [bis tag fields]
+    (let [rh (aget handlers tag)]
+      (if rh
+        (rh bis tag fields)
+        (let [values (make-array fields)]
+          (do
+            (dotimes [i fields]
+              (aset values i (bsp/read-object! bis)))
+            (fh/->TaggedObject tag values nil))))))
   bsp/ReadStream
   (read! [bis]
     (let [old-count cnt]
@@ -161,4 +172,4 @@
   (-count [bis] (alength stream)))
 
 (defn byte-input-stream [stream]
-  (->ByteInputStream stream 0))
+  (->ByteInputStream stream 0 fh/core-read-handlers))

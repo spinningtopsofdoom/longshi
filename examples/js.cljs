@@ -155,3 +155,27 @@
             (p/read-object! bis)
             (p/read-object! bis))]
   (println ro)))
+;;Encoding / decoding arrays
+(let [bos (bs/byte-output-stream 2)]
+  (p/write-object! bos #js [true 12.45 56 "foobar"])
+  (p/write-object! bos (fh/tagged-object "boolean[]" #js [true false false]))
+  (p/write-object! bos (fh/tagged-object "long[]" #js [5674 23577 -764524 (Long.fromString "9223372036854775807") (Long.fromString "-9223372036854775808")]))
+  (p/write-object! bos (js/Uint16Array. #js [23 -66 89]))
+  (p/write-object! bos (js/Int16Array. #js [23 -66 89]))
+  (p/write-object! bos (js/Uint32Array. #js [23 10000 89]))
+  (p/write-object! bos (js/Int32Array. #js [23 -66 89]))
+  (p/write-object! bos (js/Float32Array. #js [12.345 -66.9544 0.1]))
+  (p/write-object! bos (js/Float64Array. #js [12.345 -66.9544 0.1]))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            )]
+  (println ro)))

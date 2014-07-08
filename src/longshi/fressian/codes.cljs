@@ -22,6 +22,22 @@
        :BYTES_CHUNK 0xD8
        :BYTES 0xD9
        :BYTES_PACKED_LENGTH_START 0xD0
+       :LONG_ARRAY 0xB0
+       :DOUBLE_ARRAY 0xB1
+       :BOOLEAN_ARRAY 0xB2
+       :INT_ARRAY 0xB3
+       :FLOAT_ARRAY 0xB4
+       :OBJECT_ARRAY 0xB5
+       })
+
+(def tag-to-code
+  #js {
+       "int[]" (.-INT_ARRAY codes)
+       "float[]" (.-FLOAT_ARRAY codes)
+       "double[]" (.-DOUBLE_ARRAY codes)
+       "long[]" (.-LONG_ARRAY codes)
+       "boolean[]" (.-BOOLEAN_ARRAY codes)
+       "Object[]" (.-OBJECT_ARRAY codes)
        })
 
 (def ranges

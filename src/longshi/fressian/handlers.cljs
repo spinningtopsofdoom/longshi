@@ -34,7 +34,7 @@
                  (loop [i 0]
                    (if-let [v (aget (aget handlers i) k)]
                      v
-                     (when (< cnt i)
+                     (when (< i cnt)
                        (recur (inc i)))))]
         (do
           (aset cache k chain-handler)

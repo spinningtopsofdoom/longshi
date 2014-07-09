@@ -35,11 +35,12 @@
 ;;Double buffer
 (def ^:private da (make-byte-array 8))
 (def ^:private dadv (make-data-view da))
-(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers ^:mutable struct-cache]
+(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers ^:mutable struct-cache ^:mutable priority-cache]
   Object
   (reset-caches! [bos]
     (do
-      (set! struct-cache (hm/interleaved-index-hop-map 16))))
+      (set! struct-cache (hm/interleaved-index-hop-map 16))
+      (set! priority-cache (hm/interleaved-index-hop-map 16))))
   bsp/WriteStream
   (write! [bos b]
     (let [new-count (inc cnt)]
@@ -107,7 +108,13 @@
 (defn byte-output-stream
   ([] (byte-output-stream 32))
   ([len] (byte-output-stream 32 #js {}))
-  ([len user-handlers] (->ByteOutputStream (make-byte-array len) 0 (fh/write-lookup fh/core-write-handlers user-handlers) (hm/interleaved-index-hop-map 16))))
+  ([len user-handlers]
+   (->ByteOutputStream
+    (make-byte-array len)
+    0
+    (fh/write-lookup fh/core-write-handlers user-handlers)
+    (hm/interleaved-index-hop-map 16)
+    (hm/interleaved-index-hop-map 16))))
 
 (deftype StructCache [tag fields])
 (defn struct-cache
@@ -116,11 +123,12 @@
 
 (def under-construction #js {})
 
-(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers standard-handlers ^:mutable struct-cache]
+(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers standard-handlers ^:mutable struct-cache  ^:mutable priority-cache]
   Object
   (reset-caches! [bos]
     (do
-      (set! struct-cache #js [])))
+      (set! struct-cache #js [])
+      (set! priority-cache #js [])))
   (handle-struct [bis tag fields]
     (let [rh (or (aget handlers tag) (aget standard-handlers tag))]
       (if rh
@@ -138,6 +146,14 @@
           result
           ))
        (throw (js/Error. "Requested object beyond end of cache: (" index ")"))))
+  (read-and-cache-object [bis cache]
+    (let [index (alength cache)]
+      (do
+        (.push cache under-construction)
+        (let [o (p/read-object! bis)]
+          (do
+            (aset cache index o)
+            o)))))
   bsp/ReadStream
   (read! [bis]
     (let [old-count cnt]
@@ -197,4 +213,4 @@
 
 (defn byte-input-stream
   ([stream] (byte-input-stream stream #js {}))
-  ([stream user-handlers] (->ByteInputStream stream 0 user-handlers fh/core-read-handlers #js [])))
+  ([stream user-handlers] (->ByteInputStream stream 0 user-handlers fh/core-read-handlers #js [] #js [])))

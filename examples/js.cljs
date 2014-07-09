@@ -223,3 +223,20 @@
             (p/read-object! bis)
             )]
   (println ro)))
+;;Encoding / decoding cached values
+(def long-str (.join (make-array 1024) "a"))
+
+(let [bos (bs/byte-output-stream 2 my-write-handlers)]
+  (p/write-object! bos long-str true)
+  (p/write-object! bos long-str true)
+  (p/reset-caches! bos)
+  (p/write-object! bos long-str true)
+  (p/write-object! bos long-str true)
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos) my-read-handlers)
+        ro (vector
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            )]
+  (println ro)))

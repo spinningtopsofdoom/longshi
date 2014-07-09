@@ -43,6 +43,13 @@
           (recur (inc str-pos) (+ buf-pos ch-enc-size)))
         #js [str-pos buf-pos]))))
 
+(defn- should-skip-cache [o]
+  (cond
+    (or (nil? o) (identical? js/Boolean (.-constructor o))) true
+    (and (number? o) (== 1 (js-mod o 1)) (< -255 o 255)) true
+    (and (string? o) (zero? (.-length o))) true
+    :else false))
+
 (extend-type bs/ByteOutputStream
   p/FressianWriter
   (write-null! [bos] (bsp/write! bos (.-NULL c/codes)))
@@ -163,7 +170,22 @@
   (write-as! [bos tag o]
     (p/write-as! bos tag o false))
   (write-as! [bos tag o cache]
-    ((.require-write-handler (.-handlers bos) tag o) bos o))
+    (if cache
+      (if (should-skip-cache o)
+        (p/write-as! bos tag o false)
+        (let [index (.old-index! (.-priority-cache bos) tag)]
+          (cond
+            (== -1 index)
+            (do
+              (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
+              (p/write-as! bos tag o false))
+            (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
+            (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
+            :else
+            (do
+              (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
+              (p/write-int! bos index)))))
+      ((.require-write-handler (.-handlers bos) tag o) bos o)))
   (reset-caches! [bos]
     (do
       (.reset-caches! bos)
@@ -442,6 +464,15 @@
         ((.-STRUCT c/codes))
         (let [st (.lookup-cache bis (.-struct-cache bis) (p/read-int! bis))]
           (.handle-struct bis (.-tag st) (.-fields st)))
+        (0x80 0x81 0x82 0x83 0x84 0x85 0x86 0x87
+         0x88 0x89 0x8A 0x8B 0x8C 0x8D 0x8E 0x8F
+         0x90 0x91 0x92 0x93 0x94 0x95 0x96 0x97
+         0x98 0x99 0x9A 0x9B 0x9C 0x9D 0x9E 0x9F)
+        (.lookup-cache bis (.-priority-cache bis) (- code (.-PRIORITY_CACHE_PACKED_START c/codes)))
+        ((.-PUT_PRIORITY_CACHE c/codes))
+        (.read-and-cache-object bis (.-priority-cache bis))
+        ((.-GET_PRIORITY_CACHE c/codes))
+        (.lookup-cache bis (.-priority-cache bis) (p/read-int! bis))
         ((.-RESET-CACHES c/codes))
         (do
           (.reset-caches! bis)

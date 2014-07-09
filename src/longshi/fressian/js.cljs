@@ -22,9 +22,6 @@
       (- 64 (.getNumBitsAbs (.not x)))
       (- 64 (.getNumBitsAbs x)))))
 
-(defn is-int [x]
-  (zero? (js-mod x 1)))
-
 (defn string-chunk-utf8! [s start buffer]
   (loop [str-pos start buf-pos 0]
     (let [ch (.charCodeAt s str-pos)

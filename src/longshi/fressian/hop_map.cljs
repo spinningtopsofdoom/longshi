@@ -3,7 +3,7 @@
 (deftype InterleavedIndexHopMap [^:mutable cap ^:mutable cnt ^:mutable hop-idx ^:mutable ks]
   Object
   (hash [_ obj]
-     (let [h (hash obj)]
+     (let [h (bit-shift-right-zero-fill (hash obj) 0)]
        (if (== h 0)
          42
          h)))
@@ -22,7 +22,7 @@
           old-hop-idx-len (.-length old-hop-idx)
           old-keys ks]
       (do
-        (set! hop-idx (js/Int32Array. (* 2 (.-length hop-idx))))
+        (set! hop-idx (js/Uint32Array. (* 2 (.-length hop-idx))))
         (set! ks (.concat ks (js/Array. cap)))
         (set! cap (bit-shift-left cap 1))
         (loop [slot 0]
@@ -126,6 +126,6 @@
              (if (< cap capacity)
                (recur (bit-shift-left cap 1))
                cap))
-          hop-idx (js/Int32Array. (bit-shift-left cap 2))
+          hop-idx (js/Uint32Array. (bit-shift-left cap 2))
           ks (js/Array. cap)]
       (->InterleavedIndexHopMap cap 0 hop-idx ks))))

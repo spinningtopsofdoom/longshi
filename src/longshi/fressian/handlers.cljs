@@ -5,7 +5,10 @@
 (def js-int-type #js{})
 (def js-int-type-id (.getUid js/goog js-int-type))
 
-(deftype TaggedObject [tag value meta])
+(deftype TaggedObject [tag value meta]
+  IPrintWithWriter
+  (-pr-writer [_ writer _]
+    (-write writer (str tag " : [" value "]"))))
 (defn tagged-object [tag value]
   (->TaggedObject tag value nil))
 (deftype TaggedHandler [tag handler])

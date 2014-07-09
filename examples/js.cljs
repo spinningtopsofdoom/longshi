@@ -179,3 +179,47 @@
             (ta->seq (p/read-object! bis))
             )]
   (println ro)))
+;;Encoding / decoding custom types
+(defrecord Point [x y])
+(defn point [x y] (->Point x y))
+
+(defrecord Tuple2 [x1 x2])
+(defn tuple2 [x1 x2] (->Tuple2 x1 x2))
+
+(def my-write-handlers
+  (fh/create-handler
+    [[Point "user.Point"
+      (fn [fw point]
+        (do
+          (p/write-tag! fw "user.Point" 2)
+          (p/write-int! fw (.-x point))
+          (p/write-int! fw (.-y point))))]
+     [Tuple2 "user.Tuple2"
+      (fn [fw tuple2]
+        (do
+          (p/write-tag! fw "user.Tuple2" 2)
+          (p/write-int! fw (.-x1 tuple2))
+          (p/write-int! fw (.-x2 tuple2))))]]))
+(def my-read-handlers
+  #js {
+       "user.Tuple2"
+       (fn [fr tag component-count]
+         (do
+           (assert (== 2 component-count))
+           (tuple2 (p/read-int! fr) (p/read-int! fr))))
+       })
+
+(let [bos (bs/byte-output-stream 2 my-write-handlers)]
+  (p/write-object! bos (point 12 34))
+  (p/write-object! bos (point -455 456))
+  (p/reset-caches! bos)
+  (p/write-object! bos (tuple2 55 92))
+  (p/write-object! bos (tuple2 -1288 9000))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos) my-read-handlers)
+        ro (vector
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            )]
+  (println ro)))

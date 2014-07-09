@@ -146,7 +146,19 @@
   (write-tag! [bos tag component-count]
     (if-let [shortcut-code (aget c/tag-to-code tag)]
       (bsp/write! bos shortcut-code)
-      (throw (js/Error. "Not Implemented Yet"))))
+      (let [index (.old-index! (.-struct-cache bos) tag)]
+        (cond
+          (== -1 index)
+          (do
+            (bsp/write! bos (.-STRUCTTYPE c/codes))
+            (p/write-object! bos tag)
+            (p/write-int! bos component-count))
+          (< index (.-STRUCT_CACHE_PACKED_END c/ranges))
+          (bsp/write! bos (+ (.-STRUCT_CACHE_PACKED_START c/codes) index))
+          :else
+          (do
+            (bsp/write! bos (.-STRUCT c/codes))
+            (p/write-int! bos index))))))
   (write-object! [bos o]
     (p/write-object! bos o false))
   (write-object! [bos o cache]
@@ -154,7 +166,11 @@
   (write-as! [bos tag o]
     (p/write-as! bos tag o false))
   (write-as! [bos tag o cache]
-    ((.require-write-handler (.-handlers bos) tag o) bos o)))
+    ((.require-write-handler (.-handlers bos) tag o) bos o))
+  (reset-caches! [bos]
+    (do
+      (.reset-caches! bos)
+      (bsp/write! bos (.-RESET-CACHES c/codes)))))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]
@@ -416,6 +432,23 @@
         (.handle-struct bis "long[]" 2)
         ((.-OBJECT-ARRAY c/codes))
         (.handle-struct bis "Object[]" 2)
+        ((.-STRUCTTYPE c/codes))
+        (let [tag (p/read-object! bis)
+              fields (p/read-int! bis)]
+          (do
+            (.push (.-struct-cache bis) (bs/struct-cache tag fields))
+            (.handle-struct bis tag fields)))
+        (0xA0 0xA1 0xA2 0xA3 0xA4 0xA5 0xA6 0xA7
+         0xA8 0xA9 0xAA 0xAB 0xAC 0xAD 0xAE 0xAF)
+        (let [st (.lookup-cache bis (.-struct-cache bis) (- code (.-STRUCT_CACHE_PACKED_START c/codes)))]
+          (.handle-struct bis (.-tag st) (.-fields st)))
+        ((.-STRUCT c/codes))
+        (let [st (.lookup-cache bis (.-struct-cache bis) (p/read-int! bis))]
+          (.handle-struct bis (.-tag st) (.-fields st)))
+        ((.-RESET-CACHES c/codes))
+        (do
+          (.reset-caches! bis)
+          (p/read-object! bis))
         ((.-FLOAT c/codes)) (bsp/read-float! bis)
         ((.-DOUBLE_0 c/codes)) 0.0
         ((.-DOUBLE_1 c/codes)) 1.0

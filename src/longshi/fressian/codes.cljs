@@ -28,6 +28,10 @@
        :INT_ARRAY 0xB3
        :FLOAT_ARRAY 0xB4
        :OBJECT_ARRAY 0xB5
+       :STRUCTTYPE 0xEF
+       :STRUCT 0xF0
+       :STRUCT_CACHE_PACKED_START 0xA0
+       :RESET_CACHES 0xFE
        })
 
 (def tag-to-code
@@ -45,4 +49,5 @@
        :STRING_PACKED_LENGTH_END 8
        :BYTES_PACKED_LENGTH_END 8
        :BYTE_CHUNK_SIZE 65535
+       :STRUCT_CACHE_PACKED_END 16
        })

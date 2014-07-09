@@ -2,6 +2,7 @@
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.handlers :as fh]
+            [longshi.fressian.hop-map :as hm]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
 (defn adler32
@@ -34,7 +35,11 @@
 ;;Double buffer
 (def ^:private da (make-byte-array 8))
 (def ^:private dadv (make-data-view da))
-(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers]
+(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers ^:mutable struct-cache]
+  Object
+  (reset-caches! [bos]
+    (do
+      (set! struct-cache (hm/interleaved-index-hop-map 16))))
   bsp/WriteStream
   (write! [bos b]
     (let [new-count (inc cnt)]
@@ -101,19 +106,38 @@
 
 (defn byte-output-stream
   ([] (byte-output-stream 32))
-  ([len] (->ByteOutputStream (make-byte-array len) 0 (fh/write-lookup fh/core-write-handlers))))
+  ([len] (byte-output-stream 32 #js {}))
+  ([len user-handlers] (->ByteOutputStream (make-byte-array len) 0 (fh/write-lookup fh/core-write-handlers user-handlers) (hm/interleaved-index-hop-map 16))))
 
-(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers]
+(deftype StructCache [tag fields])
+(defn struct-cache
+  [tag fields]
+  (->StructCache tag fields))
+
+(def under-construction #js {})
+
+(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers standard-handlers ^:mutable struct-cache]
   Object
+  (reset-caches! [bos]
+    (do
+      (set! struct-cache #js [])))
   (handle-struct [bis tag fields]
-    (let [rh (aget handlers tag)]
+    (let [rh (or (aget handlers tag) (aget standard-handlers tag))]
       (if rh
         (rh bis tag fields)
         (let [values (make-array fields)]
           (do
             (dotimes [i fields]
-              (aset values i (bsp/read-object! bis)))
-            (fh/->TaggedObject tag values nil))))))
+              (aset values i (p/read-object! bis)))
+            (fh/tagged-object tag values))))))
+  (lookup-cache [bis cache index]
+    (if (< index (alength cache))
+      (let [result (aget cache index)]
+        (if (identical? under-construction result)
+          (throw (js/Error. "Unable to resolve circular refernce in cache"))
+          result
+          ))
+       (throw (js/Error. "Requested object beyond end of cache: (" index ")"))))
   bsp/ReadStream
   (read! [bis]
     (let [old-count cnt]
@@ -171,5 +195,6 @@
   ICounted
   (-count [bis] (alength stream)))
 
-(defn byte-input-stream [stream]
-  (->ByteInputStream stream 0 fh/core-read-handlers))
+(defn byte-input-stream
+  ([stream] (byte-input-stream stream #js {}))
+  ([stream user-handlers] (->ByteInputStream stream 0 user-handlers fh/core-read-handlers #js [])))

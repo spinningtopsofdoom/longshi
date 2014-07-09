@@ -11,7 +11,8 @@
   (write-bytes! [fw b])
   (write-tag! [fw tag component-count])
   (write-object! [fw o] [fw o cache])
-  (write-as! [fw tag o] [fw tag o cache]))
+  (write-as! [fw tag o] [fw tag o cache])
+  (reset-caches! [fw]))
 
 (defprotocol FressianReader
   (read-boolean! [fr])

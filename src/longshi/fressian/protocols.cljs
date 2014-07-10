@@ -12,11 +12,13 @@
   (write-tag! [fw tag component-count])
   (write-object! [fw o] [fw o cache])
   (write-as! [fw tag o] [fw tag o cache])
-  (reset-caches! [fw]))
+  (reset-caches! [fw])
+  (write-footer! [fw]))
 
 (defprotocol FressianReader
   (read-boolean! [fr])
   (read-float! [fr])
   (read-double! [fr])
   (read-int! [fr])
-  (read-object! [fr]))
+  (read-object! [fr])
+  (validate-footer! [fr]))

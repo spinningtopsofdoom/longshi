@@ -240,3 +240,32 @@
             (p/read-object! bis)
             )]
   (println ro)))
+;;Encoding / decoding footers
+(let [bos (bs/byte-output-stream 2)]
+  (do
+    (p/write-object! bos nil)
+    (p/write-object! bos true)
+    (p/write-object! bos 42)
+    (p/write-footer! bos)
+    (p/write-object! bos 3.14)
+    (p/write-object! bos "foobar")
+    (p/write-object! bos (js/Uint8Array. #js [-34 12 34]))
+    (p/write-footer! bos)
+    (p/write-object! bos (js/Int8Array. #js [-99 12 56]))
+    (p/write-object! bos 2.718)
+    (p/write-footer! bos)
+    )
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (p/read-object! bis)
+            (ta->seq (p/read-object! bis))
+            (ta->seq (p/read-object! bis))
+            (p/read-object! bis)
+            )]
+    (do
+      (p/validate-footer! bis)
+      (println ro))))

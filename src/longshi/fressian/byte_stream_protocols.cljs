@@ -1,7 +1,17 @@
-(ns longshi.fressian.byte-stream-protocols)
+(ns longshi.fressian.byte-stream-protocols
+  (:refer-clojure :exclude [reset!]))
 
 (defprotocol SeekStream
   (seek! [ss pos]))
+
+(defprotocol ResetStream
+  (reset! [rs]))
+
+(defprotocol CheckedStream
+  (get-checksum [cs]))
+
+(defprotocol RawWriteStream
+  (bytes-written [rws]))
 
 (defprotocol WriteStream
   (write! [ws b])
@@ -21,6 +31,9 @@
 
 (defprotocol DoubleWriteStream
   (write-double! [dws d]))
+
+(defprotocol RawReadStream
+  (bytes-read [rrs]))
 
 (defprotocol ReadStream
   (read! [rs])

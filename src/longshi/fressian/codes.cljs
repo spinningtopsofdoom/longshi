@@ -35,6 +35,8 @@
        :PRIORITY_CACHE_PACKED_START 0x80
        :GET_PRIORITY_CACHE 0xCC
        :PUT_PRIORITY_CACHE 0xCD
+       :FOOTER_MAGIC 0xCFCFCFCF
+       :FOOTER 0xCF
        })
 
 (def tag-to-code

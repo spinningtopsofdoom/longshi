@@ -188,8 +188,16 @@
       ((.require-write-handler (.-handlers bos) tag o) bos o)))
   (reset-caches! [bos]
     (do
-      (.reset-caches! bos)
-      (bsp/write! bos (.-RESET-CACHES c/codes)))))
+      (.clear-caches! bos)
+      (bsp/write! bos (.-RESET-CACHES c/codes))))
+  (write-footer! [bos]
+    (let [length (bsp/bytes-written bos)]
+      (do
+        (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
+        (bsp/write-int32! bos length)
+        (bsp/write-int32! bos (bsp/get-checksum bos))
+        (bsp/reset! bos)
+        (.clear-caches! bos)))))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]
@@ -475,9 +483,24 @@
         (.lookup-cache bis (.-priority-cache bis) (p/read-int! bis))
         ((.-RESET-CACHES c/codes))
         (do
-          (.reset-caches! bis)
+          (.clear-caches! bis)
           (p/read-object! bis))
+        ((.-FOOTER c/codes))
+        (let [calculated-length (dec (bsp/bytes-read bis))
+              magic-from-stream (+ (bit-shift-right-zero-fill (bit-shift-left code 24) 0) (bsp/read-int24! bis))]
+          (do
+            (.validate-footer! bis calculated-length magic-from-stream)
+            (bsp/reset! bis)
+            (.clear-caches! bis)
+            (p/read-object! bis)))
         ((.-FLOAT c/codes)) (bsp/read-float! bis)
         ((.-DOUBLE_0 c/codes)) 0.0
         ((.-DOUBLE_1 c/codes)) 1.0
-        ((.-DOUBLE c/codes)) (bsp/read-double! bis)))))
+        ((.-DOUBLE c/codes)) (bsp/read-double! bis))))
+  (validate-footer! [bis]
+    (let [calculated-length (bsp/bytes-read bis)
+          magic-from-stream (bsp/read-unsigned-int32! bis)]
+      (do
+        (.validate-footer! bis calculated-length magic-from-stream)
+        (bsp/reset! bis)
+        (.clear-caches! bis)))))

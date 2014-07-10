@@ -3,6 +3,7 @@
             [longshi.fressian.protocols :as p]
             [longshi.fressian.handlers :as fh]
             [longshi.fressian.hop-map :as hm]
+            [longshi.fressian.codes :as c]
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
 (defn adler32
@@ -35,12 +36,21 @@
 ;;Double buffer
 (def ^:private da (make-byte-array 8))
 (def ^:private dadv (make-data-view da))
-(deftype ByteOutputStream [^:mutable stream ^:mutable cnt handlers ^:mutable struct-cache ^:mutable priority-cache]
+(deftype ByteOutputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers ^:mutable struct-cache ^:mutable priority-cache]
   Object
-  (reset-caches! [bos]
+  (clear-caches! [bos]
     (do
       (set! struct-cache (hm/interleaved-index-hop-map 16))
       (set! priority-cache (hm/interleaved-index-hop-map 16))))
+  bsp/CheckedStream
+  (get-checksum [bos]
+    (adler32 (.subarray stream checkpoint cnt)))
+  bsp/ResetStream
+  (reset! [bos]
+    (set! checkpoint cnt))
+  bsp/RawWriteStream
+  (bytes-written [bos]
+    (- cnt checkpoint))
   bsp/WriteStream
   (write! [bos b]
     (let [new-count (inc cnt)]
@@ -58,10 +68,10 @@
           (set! stream new-stream)))
       (.set stream (.subarray b off (+ off len)) cnt)
       (set! cnt new-count)))
-   (get-bytes [bos]
-     (let [new-stream (make-byte-array cnt)]
-       (.set new-stream (.subarray stream 0 cnt))
-       new-stream))
+  (get-bytes [bos]
+    (let [new-stream (make-byte-array cnt)]
+      (.set new-stream (.subarray stream 0 cnt))
+      new-stream))
   bsp/IntegerWriteStream
   (write-int16! [bos i16]
     (do
@@ -112,6 +122,7 @@
    (->ByteOutputStream
     (make-byte-array len)
     0
+    0
     (fh/write-lookup fh/core-write-handlers user-handlers)
     (hm/interleaved-index-hop-map 16)
     (hm/interleaved-index-hop-map 16))))
@@ -123,9 +134,9 @@
 
 (def under-construction #js {})
 
-(deftype ByteInputStream [^:mutable stream ^:mutable cnt handlers standard-handlers ^:mutable struct-cache  ^:mutable priority-cache]
+(deftype ByteInputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers standard-handlers ^:mutable struct-cache  ^:mutable priority-cache use-checksum]
   Object
-  (reset-caches! [bos]
+  (clear-caches! [bos]
     (do
       (set! struct-cache #js [])
       (set! priority-cache #js [])))
@@ -154,18 +165,41 @@
           (do
             (aset cache index o)
             o)))))
+  (validate-footer! [bis calculated-length magic-from-string]
+    (let [valid-magic (== magic-from-string (.-FOOTER_MAGIC c/codes))
+          stream-length (if valid-magic (bsp/read-int32! bis) -1)
+          valid-length (and valid-magic (== stream-length calculated-length))
+          checksum (if (and valid-length use-checksum) (bsp/get-checksum bis) -1)
+          stream-checksum (if (and valid-length use-checksum) (bsp/read-unsigned-int32! bis) -1)
+          valid-checksum (if (and valid-length use-checksum) (== stream-checksum checksum) true)]
+      (cond
+        (not valid-magic)
+        (throw (js/Error. (str "Invalid footer magic expected (" (.-FOOTER_MAGIC c/codes) ") and got (" magic-from-string ")")))
+        (not valid-length)
+        (throw (js/Error. (str "Invalid footer length expected (" stream-length ") and got (" calculated-length ")")))
+        (not valid-checksum)
+        (throw (js/Error. (str "Invalid footer checksum expected (" stream-checksum ") and got (" checksum ")"))))))
+  bsp/CheckedStream
+  (get-checksum [bos]
+    (adler32 (.subarray stream checkpoint cnt)))
+  bsp/ResetStream
+  (reset! [bos]
+    (set! checkpoint cnt))
+  bsp/RawReadStream
+  (bytes-read [bos]
+    (- cnt checkpoint))
   bsp/ReadStream
   (read! [bis]
     (let [old-count cnt]
       (if (< (alength stream) cnt)
-        (throw (js/Error. "Can not read (1) bytes, Input Stream only has (0) bytes available")))
-      (set! cnt (inc cnt))
+        (throw (js/Error. "Can not read (1) bytes, Input Stream only has (0) bytes available"))
+        (set! cnt (inc cnt)))
       (aget stream old-count)))
   (read-bytes! [bis b off len]
     (let [old-count cnt]
       (if (< (alength stream) (+ cnt len off))
-        (throw (js/Error. (str "Can not read (" len ") bytes at offset (" off "), Input Stream only has (" (bsp/available bis)") bytes available"))))
-      (set! cnt (+ cnt off len))
+        (throw (js/Error. (str "Can not read (" len ") bytes at offset (" off "), Input Stream only has (" (bsp/available bis)") bytes available")))
+        (set! cnt (+ cnt off len)))
       (.set b (.subarray stream (+ old-count off) (+ old-count off len)))))
   (available [bis] (max 0 (- (alength stream) cnt)))
   bsp/IntegerReadStream
@@ -215,4 +249,5 @@
 
 (defn byte-input-stream
   ([stream] (byte-input-stream stream #js {}))
-  ([stream user-handlers] (->ByteInputStream stream 0 user-handlers fh/core-read-handlers #js [] #js [])))
+  ([stream user-handlers] (byte-input-stream stream #js {} true))
+  ([stream user-handlers use-checksum] (->ByteInputStream stream 0 0 user-handlers fh/core-read-handlers #js [] #js [] use-checksum)))

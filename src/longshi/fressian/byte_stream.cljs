@@ -175,7 +175,8 @@
       (.getInt16 i32adv 0 little-endian)))
   (read-int24! [bis]
     (do
-      (bsp/read-bytes! bis i32a 0 3)
+      (bsp/read-bytes! bis (.subarray i32a 1 4) 0 3)
+      (aset i32a 0 0)
       (.getInt32 i32adv 0 little-endian)))
   (read-int32! [bis]
     (do
@@ -187,7 +188,8 @@
       (.getUint16 i32adv 0 little-endian)))
   (read-unsigned-int24! [bis]
     (do
-      (bsp/read-bytes! bis i32a 0 3)
+      (bsp/read-bytes! bis (.subarray i32a 1 4) 0 3)
+      (aset i32a 0 0)
       (.getUint32 i32adv 0 little-endian)))
   (read-unsigned-int32! [bis]
     (do

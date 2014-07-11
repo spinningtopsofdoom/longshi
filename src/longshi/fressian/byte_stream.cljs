@@ -42,6 +42,13 @@
     (do
       (set! struct-cache (hm/interleaved-index-hop-map 16))
       (set! priority-cache (hm/interleaved-index-hop-map 16))))
+  bsp/ByteBuffer
+  (get-bytes [bos]
+    stream)
+  (duplicate-bytes [bos]
+    (let [new-stream (make-byte-array cnt)]
+      (.set new-stream (.subarray stream 0 cnt))
+      new-stream))
   bsp/CheckedStream
   (get-checksum [bos]
     (adler32 (.subarray stream checkpoint cnt)))
@@ -68,10 +75,6 @@
           (set! stream new-stream)))
       (.set stream (.subarray b off (+ off len)) cnt)
       (set! cnt new-count)))
-  (get-bytes [bos]
-    (let [new-stream (make-byte-array cnt)]
-      (.set new-stream (.subarray stream 0 cnt))
-      new-stream))
   bsp/IntegerWriteStream
   (write-int16! [bos i16]
     (do
@@ -179,6 +182,13 @@
         (throw (js/Error. (str "Invalid footer length expected (" stream-length ") and got (" calculated-length ")")))
         (not valid-checksum)
         (throw (js/Error. (str "Invalid footer checksum expected (" stream-checksum ") and got (" checksum ")"))))))
+  bsp/ByteBuffer
+  (get-bytes [bis]
+    stream)
+  (duplicate-bytes [bis]
+    (let [new-stream (make-byte-array cnt)]
+      (.set new-stream (.subarray stream 0 cnt))
+      new-stream))
   bsp/CheckedStream
   (get-checksum [bos]
     (adler32 (.subarray stream checkpoint cnt)))

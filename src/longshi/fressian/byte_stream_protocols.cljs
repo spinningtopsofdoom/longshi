@@ -1,6 +1,10 @@
 (ns longshi.fressian.byte-stream-protocols
   (:refer-clojure :exclude [reset!]))
 
+(defprotocol ByteBuffer
+  (duplicate-bytes [bb])
+  (get-bytes [bb]))
+
 (defprotocol SeekStream
   (seek! [ss pos]))
 
@@ -15,8 +19,7 @@
 
 (defprotocol WriteStream
   (write! [ws b])
-  (write-bytes! [ws b off len])
-  (get-bytes [ws]))
+  (write-bytes! [ws b off len]))
 
 (defprotocol IntegerWriteStream
   (write-int16! [iws i16])

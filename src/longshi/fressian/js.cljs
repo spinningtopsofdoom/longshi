@@ -51,6 +51,28 @@
     :else false))
 
 (extend-type bs/ByteOutputStream
+  p/StreamingWriter
+  (begin-closed-list! [bos] (bsp/write! bos (.-BEGIN_CLOSED_LIST c/codes)))
+  (end-list! [bos] (bsp/write! bos (.-END_COLLECTION c/codes)))
+  (begin-open-list! [bos]
+    (if-not (zero? (bsp/bytes-written bos))
+      (throw (js/Error. "openList must be called from the top level, outside any footer context."))
+      (do
+        (bsp/reset! bos)
+        (bsp/write! bos (.-BEGIN_OPEN_LIST c/codes)))))
+  (write-footer-for! [bos byte-buffer]
+    (let [source (bsp/duplicate-bytes byte-buffer)]
+      (if-not (zero? (bsp/bytes-written bos))
+        (throw (js/Error. "writeFooterFor can only be called at a footer boundary."))
+        (do
+          (bsp/write-bytes! bos source 0 (alength source))
+          (let [length (bsp/bytes-written bos)]
+            (do
+              (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
+              (bsp/write-int32! bos length)
+              (bsp/write-int32! bos (bsp/get-checksum bos))
+              (bsp/reset! bos)
+              (.clear-caches! bos)))))))
   p/FressianWriter
   (write-null! [bos] (bsp/write! bos (.-NULL c/codes)))
   (write-boolean! [bos b] (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes))))
@@ -472,6 +494,26 @@
         (.handle-struct bis "long[]" 2)
         ((.-OBJECT-ARRAY c/codes))
         (.handle-struct bis "Object[]" 2)
+        ((.-BEGIN_CLOSED_LIST c/codes))
+        (let [oa #js []]
+          (loop []
+            (if (== (.-END_COLLECTION c/codes) (.peek-read bis))
+              (do
+                (bsp/read! bis)
+                oa)
+              (do
+                (.push oa (p/read-object! bis))
+                (recur)))))
+        ((.-BEGIN_OPEN_LIST c/codes))
+        (let [oa #js []]
+          (loop [code (.peek-read bis)]
+            (if (or (== (.-END_COLLECTION c/codes) code) (nil? code))
+              (do
+                (bsp/read! bis)
+                oa)
+              (do
+                (.push oa (p/read-object! bis))
+                (recur (.peek-read bis))))))
         (0xE4 0xE5 0xE6 0xE7 0xE8 0xE9 0xEA 0xEB)
         (let [oa #js []
               length (- code (.-LIST_PACKED_LENGTH_START c/codes))]

@@ -182,6 +182,9 @@
         (throw (js/Error. (str "Invalid footer length expected (" stream-length ") and got (" calculated-length ")")))
         (not valid-checksum)
         (throw (js/Error. (str "Invalid footer checksum expected (" stream-checksum ") and got (" checksum ")"))))))
+  (peek-read [bos]
+    (when-not (< (alength stream) cnt)
+      (aget stream cnt)))
   bsp/ByteBuffer
   (get-bytes [bis]
     stream)

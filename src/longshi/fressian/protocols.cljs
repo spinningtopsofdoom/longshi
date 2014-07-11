@@ -16,6 +16,12 @@
   (reset-caches! [fw])
   (write-footer! [fw]))
 
+(defprotocol StreamingWriter
+  (begin-closed-list! [sw])
+  (end-list! [sw])
+  (begin-open-list! [sw])
+  (write-footer-for! [sw bb]))
+
 (defprotocol FressianReader
   (read-boolean! [fr])
   (read-float! [fr])

@@ -37,6 +37,9 @@
        :PUT_PRIORITY_CACHE 0xCD
        :FOOTER_MAGIC 0xCFCFCFCF
        :FOOTER 0xCF
+       :LIST_PACKED_LENGTH_START 0xE4
+       :LIST_PACKED_LENGTH_END 0xEC
+       :LIST 0xEC
        })
 
 (def tag-to-code

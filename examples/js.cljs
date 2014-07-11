@@ -269,3 +269,11 @@
     (do
       (p/validate-footer! bis)
       (println ro))))
+;;Encoding / decoding lists
+(let [bos (bs/byte-output-stream 2)]
+  (p/write-list! bos [12.4 "foo" nil false])
+  (p/write-list! bos ["0" "1" "2" "3" "4" "5" "6" "7" "8" "9"])
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector (p/read-object! bis)
+                   (p/read-object! bis))]
+    (println ro)))

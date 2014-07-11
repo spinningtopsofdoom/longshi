@@ -147,6 +147,19 @@
       (do
         (bsp/write! bos (.-DOUBLE c/codes))
         (bsp/write-double! bos d))))
+  (write-list! [bos l]
+    (let [list-seq
+          (cond
+            (array? l) (prim-seq l)
+            (seq? l) l
+            (seqable? l) (seq l))
+          length (count l)]
+      (do
+        (if (< length (.-LIST_PACKED_LENGTH_END c/codes))
+          (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
+          (bsp/write! bos (.-LIST c/codes)))
+        (doseq [li l]
+          (p/write-object! bos li)))))
   (write-tag! [bos tag component-count]
     (if-let [shortcut-code (aget c/tag-to-code tag)]
       (bsp/write! bos shortcut-code)
@@ -459,6 +472,20 @@
         (.handle-struct bis "long[]" 2)
         ((.-OBJECT-ARRAY c/codes))
         (.handle-struct bis "Object[]" 2)
+        (0xE4 0xE5 0xE6 0xE7 0xE8 0xE9 0xEA 0xEB)
+        (let [oa #js []
+              length (- code (.-LIST_PACKED_LENGTH_START c/codes))]
+          (do
+            (dotimes [i length]
+              (.push oa (p/read-object! bis)))
+            oa))
+        ((.-LIST c/codes))
+        (let [oa #js []
+              length (bsp/read-int32! bis)]
+          (do
+            (dotimes [i length]
+              (.push oa (p/read-object! bis)))
+            oa))
         ((.-STRUCTTYPE c/codes))
         (let [tag (p/read-object! bis)
               fields (p/read-int! bis)]

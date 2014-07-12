@@ -43,10 +43,30 @@
        :LIST_PACKED_LENGTH_START 0xE4
        :LIST_PACKED_LENGTH_END 0xEC
        :LIST 0xEC
+       :MAP 0xC0
+       :SET 0xC1
+       :UUID 0xC3
+       :REGEX 0xC4
+       :URI 0xC5;
+       :BIGINT 0xC6
+       :BIGDEC 0xC7
+       :INST 0xC8
+       :SYM 0xC9
+       :KEY 0xCA
        })
 
 (def tag-to-code
   #js {
+       "map" (.-MAP codes)
+       "set" (.-SET codes)
+       "uuid" (.-UUID codes)
+       "regex" (.-REGEX codes)
+       "uri" (.-URI codes)
+       "bigint" (.-BIGINT codes)
+       "bigdec" (.-BIGDEC codes)
+       "inst" (.-INST codes)
+       "sym" (.-SYM codes)
+       "key" (.-KEY codes)
        "int[]" (.-INT_ARRAY codes)
        "float[]" (.-FLOAT_ARRAY codes)
        "double[]" (.-DOUBLE_ARRAY codes)

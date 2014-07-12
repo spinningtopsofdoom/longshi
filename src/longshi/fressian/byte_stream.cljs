@@ -29,7 +29,7 @@
         (aset sums 1 (js-mod (aget sums 1) 65521))
         (unsigned-bit-shift-right (bit-or (bit-shift-left (aget sums 1) 16) (aget sums 0)) 0)))))
 
-(def ^:private little-endian false)
+(def little-endian false)
 ;;Integer buffer
 (def ^:private i32a (make-byte-array 4))
 (def ^:private i32adv (make-data-view i32a))
@@ -126,7 +126,7 @@
     (make-byte-array len)
     0
     0
-    (fh/write-lookup fh/core-write-handlers user-handlers)
+    (fh/write-lookup fh/core-write-handlers user-handlers fh/extended-write-handlers)
     (hm/interleaved-index-hop-map 16)
     (hm/interleaved-index-hop-map 16))))
 

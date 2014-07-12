@@ -331,3 +331,14 @@
                    (p/read-object! bis)
                    )]
     (println ro)))
+;;Encoding / decoding inst, uuid, and regex data types
+(let [bos (bs/byte-output-stream 2)]
+  (p/write-object! bos (js/Date. 12))
+  (p/write-object! bos (UUID. "ec9b1b11-74b0-48a4-989c-7e939fd37dec"))
+  (p/write-object! bos (js/RegExp. "[0-9a-fA-F]{1,4}" "g"))
+  (let [bis (bs/byte-input-stream (bsp/get-bytes bos))
+        ro (vector  (p/read-object! bis)
+                    (p/read-object! bis)
+                    (p/read-object! bis)
+                   )]
+    (println ro)))

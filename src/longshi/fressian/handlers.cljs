@@ -1,6 +1,8 @@
 (ns longshi.fressian.handlers
   (:import [goog.math Long])
-  (:require [longshi.fressian.protocols :as p]))
+  (:require [longshi.fressian.protocols :as p]
+            [longshi.fressian.byte-stream :as bs]
+            [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
 
 (def js-int-type #js{})
 (def js-int-type-id (.getUid js/goog js-int-type))
@@ -113,6 +115,31 @@
               (p/write-object! fw (aget (.-value to) i))))))]
      ]))
 
+(def ^:private uuid-ba (make-byte-array 16))
+(def ^:private uuid-dv (make-data-view uuid-ba))
+(def extended-write-handlers
+  (create-handler
+    [[js/Date "inst"
+     (fn [fw d]
+       (do
+         (p/write-tag! fw "inst" 1)
+         (p/write-int! fw (.getUTCMilliseconds d))))]
+     [UUID "uuid"
+     (fn [fw uuid]
+       (do
+         (p/write-tag! fw "uuid" 1)
+         (let [uuid-str (.-uuid uuid)
+               uuid-chunks (.match uuid-str (js/RegExp. "[0-9a-fA-F]{1,4}" "g"))]
+           (do
+             (dotimes [i (alength uuid-chunks)]
+               (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) bs/little-endian))
+             (p/write-bytes! fw uuid-ba)))))]
+     [js/RegExp "regex"
+     (fn [fw re]
+       (do
+         (p/write-tag! fw "regex" 1)
+         (p/write-string! fw (.-source re))))]]))
+
 (defn- int-check [i]
   (do
     (when-not (and (number? i) (== i (bit-or i 0)))
@@ -169,4 +196,20 @@
                (dotimes [i size]
                  (aset oa i (p/read-object! fr)))
                oa)))
+         "inst"
+         (fn [fr tag component-count]
+           (let [utc-millis (p/read-int! fr)]
+             (js/Date. utc-millis)))
+         "uuid"
+         (fn [fr tag component-count]
+           (let [uuid-bytes (p/read-object! fr)
+                 uuid-chunks #js []]
+             (do
+               (dotimes [i 8]
+                 (aset uuid-chunks  i (.toString (.getUint16 uuid-dv (* i 2) false) 16)))
+               (UUID. (.replace (.join uuid-chunks "") #"(.{8})(.{4})(.{4})(.{4})(.{8})" "$1-$2-$3-$4-$5")))))
+         "regex"
+         (fn [fr tag component-count]
+           (let [pattern (p/read-object! fr)]
+             (js/RegExp. pattern)))
        }))

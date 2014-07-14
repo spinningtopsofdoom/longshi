@@ -59,7 +59,8 @@
       (throw (js/Error. "openList must be called from the top level, outside any footer context."))
       (do
         (bsp/reset! bos)
-        (bsp/write! bos (.-BEGIN_OPEN_LIST c/codes)))))
+        (bsp/write! bos (.-BEGIN_OPEN_LIST c/codes))
+        bos)))
   (write-footer-for! [bos byte-buffer]
     (let [source (bsp/duplicate-bytes byte-buffer)]
       (if-not (zero? (bsp/bytes-written bos))
@@ -72,116 +73,134 @@
               (bsp/write-int32! bos length)
               (bsp/write-int32! bos (bsp/get-checksum bos))
               (bsp/reset! bos)
-              (.clear-caches! bos)))))))
+              (.clear-caches! bos)))
+          bos))))
   p/FressianWriter
-  (write-null! [bos] (bsp/write! bos (.-NULL c/codes)))
-  (write-boolean! [bos b] (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes))))
+  (write-null! [bos]
+    (do
+      (bsp/write! bos (.-NULL c/codes))
+      bos))
+  (write-boolean! [bos b]
+    (do
+      (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes)))
+      bos))
   (write-string! [bos s]
     (let [max-bytes (Math/min (* (alength s) 3) 65536)
           sba (make-byte-array max-bytes)]
-      (loop [str-pos 0]
-        (let [sa (string-chunk-utf8! s str-pos sba)
-              new-str-pos (aget sa 0)
-              buf-pos (aget sa 1)]
-          (cond
-            (< buf-pos (.-STRING_PACKED_LENGTH_END c/ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START c/codes) buf-pos))
-            (= new-str-pos (alength s))
-              (do
-                (bsp/write! bos (.-STRING c/codes))
-                (p/write-int! bos buf-pos))
-            :else
-              (do
-                (bsp/write! bos (.-STRING_CHUNK c/codes))
-                (p/write-int! bos buf-pos)))
-          (bsp/write-bytes! bos sba 0 buf-pos)
-          (if (< new-str-pos (alength s))
-            (recur new-str-pos))))))
-  (write-bytes! [bos b]
-    (if (< (alength b) (.-BYTES_PACKED_LENGTH_END c/ranges))
       (do
-        (bsp/write! bos (+ (alength b) (.-BYTES_PACKED_LENGTH_START c/codes)))
-        (bsp/write-bytes! bos b 0 (alength b)))
-      (loop [offset 0 length (alength b)]
-        (if (> length (.-BYTE_CHUNK_SIZE c/ranges))
-          (do
-            (bsp/write! bos (.-BYTES_CHUNK c/codes))
-            (p/write-int! bos (.-BYTE_CHUNK_SIZE c/ranges))
-            (bsp/write-bytes! bos b offset (.-BYTE_CHUNK_SIZE c/ranges))
-            (recur (+ offset (.-BYTE_CHUNK_SIZE c/ranges)) (- length (.-BYTE_CHUNK_SIZE c/ranges))))
-          (do
-            (bsp/write! bos (.-BYTES c/codes))
-            (p/write-int! bos length)
-            (bsp/write-bytes! bos b offset length))))))
+        (loop [str-pos 0]
+          (let [sa (string-chunk-utf8! s str-pos sba)
+                new-str-pos (aget sa 0)
+                buf-pos (aget sa 1)]
+            (cond
+              (< buf-pos (.-STRING_PACKED_LENGTH_END c/ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START c/codes) buf-pos))
+              (= new-str-pos (alength s))
+                (do
+                  (bsp/write! bos (.-STRING c/codes))
+                  (p/write-int! bos buf-pos))
+              :else
+                (do
+                  (bsp/write! bos (.-STRING_CHUNK c/codes))
+                  (p/write-int! bos buf-pos)))
+            (bsp/write-bytes! bos sba 0 buf-pos)
+            (if (< new-str-pos (alength s))
+              (recur new-str-pos))))
+        bos)))
+  (write-bytes! [bos b]
+    (do
+      (if (< (alength b) (.-BYTES_PACKED_LENGTH_END c/ranges))
+        (do
+          (bsp/write! bos (+ (alength b) (.-BYTES_PACKED_LENGTH_START c/codes)))
+          (bsp/write-bytes! bos b 0 (alength b)))
+        (loop [offset 0 length (alength b)]
+          (if (> length (.-BYTE_CHUNK_SIZE c/ranges))
+            (do
+              (bsp/write! bos (.-BYTES_CHUNK c/codes))
+              (p/write-int! bos (.-BYTE_CHUNK_SIZE c/ranges))
+              (bsp/write-bytes! bos b offset (.-BYTE_CHUNK_SIZE c/ranges))
+              (recur (+ offset (.-BYTE_CHUNK_SIZE c/ranges)) (- length (.-BYTE_CHUNK_SIZE c/ranges))))
+            (do
+              (bsp/write! bos (.-BYTES c/codes))
+              (p/write-int! bos length)
+              (bsp/write-bytes! bos b offset length)))))
+      bos))
   (write-int! [bos i]
     (p/write-long! bos (Long.fromNumber i)))
   (write-long! [bos l]
-    (let [lb (.getLowBits l)
-          hb (.getHighBits l)
-          bits (bit-switch l)]
-      (case bits
-        (1 2 3 4 5 6 7 8 9 10 11 12 13 14)
-        (do
-          (bsp/write! bos (.-INT c/codes))
-          (bsp/write-int32! bos hb)
-          (bsp/write-int32! bos lb))
-        (15 16 17 18 19 20 21 22)
-        (let [ic (bit-shift-right hb 16)]
+    (do
+      (let [lb (.getLowBits l)
+            hb (.getHighBits l)
+            bits (bit-switch l)]
+        (case bits
+          (1 2 3 4 5 6 7 8 9 10 11 12 13 14)
           (do
-            (bsp/write! bos (+ (.-INT_PACKED_7_ZERO c/codes) ic))
-            (bsp/write-int16! bos hb)
-            (bsp/write-int32! bos lb)))
-        (23 24 25 26 27 28 29 30)
-        (let [ic (bit-shift-right hb 8)]
+            (bsp/write! bos (.-INT c/codes))
+            (bsp/write-int32! bos hb)
+            (bsp/write-int32! bos lb))
+          (15 16 17 18 19 20 21 22)
+          (let [ic (bit-shift-right hb 16)]
+            (do
+              (bsp/write! bos (+ (.-INT_PACKED_7_ZERO c/codes) ic))
+              (bsp/write-int16! bos hb)
+              (bsp/write-int32! bos lb)))
+          (23 24 25 26 27 28 29 30)
+          (let [ic (bit-shift-right hb 8)]
+            (do
+              (bsp/write! bos (+ (.-INT_PACKED_6_ZERO c/codes) ic))
+              (bsp/write! bos hb)
+              (bsp/write-int32! bos lb)))
+          (31 32 33 34 35 36 37 38)
           (do
-            (bsp/write! bos (+ (.-INT_PACKED_6_ZERO c/codes) ic))
-            (bsp/write! bos hb)
-            (bsp/write-int32! bos lb)))
-        (31 32 33 34 35 36 37 38)
-        (do
-          (bsp/write! bos (+ (.-INT_PACKED_5_ZERO c/codes) hb))
-          (bsp/write-int32! bos lb))
-        (39 40 41 42 43 44)
-        (do
-          (bsp/write! bos (+ (.-INT_PACKED_4_ZERO c/codes) (bit-shift-right lb 24)))
-          (bsp/write-int24! bos lb))
-        (45 46 47 48 49 50 51)
-        (do
-          (bsp/write! bos (+ (.-INT_PACKED_3_ZERO c/codes) (bit-shift-right lb 16)))
-          (bsp/write-int16! bos lb))
-        (52 53 54 55 56 57)
-        (do
-          (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8)))
-          (bsp/write! bos lb))
-        (58 59 60 61 62 63 64)
-        (do
-          (when (< lb -1)
-            (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8))))
-          (bsp/write! bos lb))
-        (throw (js/Error. (str "Long (" l ") can not be converted"))))))
+            (bsp/write! bos (+ (.-INT_PACKED_5_ZERO c/codes) hb))
+            (bsp/write-int32! bos lb))
+          (39 40 41 42 43 44)
+          (do
+            (bsp/write! bos (+ (.-INT_PACKED_4_ZERO c/codes) (bit-shift-right lb 24)))
+            (bsp/write-int24! bos lb))
+          (45 46 47 48 49 50 51)
+          (do
+            (bsp/write! bos (+ (.-INT_PACKED_3_ZERO c/codes) (bit-shift-right lb 16)))
+            (bsp/write-int16! bos lb))
+          (52 53 54 55 56 57)
+          (do
+            (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8)))
+            (bsp/write! bos lb))
+          (58 59 60 61 62 63 64)
+          (do
+            (when (< lb -1)
+              (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8))))
+            (bsp/write! bos lb))
+          (throw (js/Error. (str "Long (" l ") can not be converted")))))
+      bos))
   (write-float! [bos f]
     (do
       (bsp/write! bos (.-FLOAT c/codes))
-      (bsp/write-float! bos f)))
+      (bsp/write-float! bos f)
+      bos))
   (write-double! [bos d]
-    (case d
-      0.0 (bsp/write! bos (.-DOUBLE_0 c/codes))
-      1.0 (bsp/write! bos (.-DOUBLE_1 c/codes))
-      (do
-        (bsp/write! bos (.-DOUBLE c/codes))
-        (bsp/write-double! bos d))))
+    (do
+      (case d
+        0.0 (bsp/write! bos (.-DOUBLE_0 c/codes))
+        1.0 (bsp/write! bos (.-DOUBLE_1 c/codes))
+        (do
+          (bsp/write! bos (.-DOUBLE c/codes))
+          (bsp/write-double! bos d)))
+      bos))
   (write-list! [bos l]
-    (let [list-seq
-          (cond
-            (array? l) (prim-seq l)
-            (seq? l) l
-            (seqable? l) (seq l))
-          length (count l)]
-      (do
-        (if (< length (.-LIST_PACKED_LENGTH_END c/codes))
-          (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
-          (bsp/write! bos (.-LIST c/codes)))
-        (doseq [li l]
-          (p/write-object! bos li)))))
+    (do
+      (let [list-seq
+            (cond
+              (array? l) (prim-seq l)
+              (seq? l) l
+              (seqable? l) (seq l))
+            length (count l)]
+        (do
+          (if (< length (.-LIST_PACKED_LENGTH_END c/codes))
+            (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
+            (bsp/write! bos (.-LIST c/codes)))
+          (doseq [li l]
+            (p/write-object! bos li))))
+      bos))
   (write-tag! [bos tag component-count]
     (if-let [shortcut-code (aget c/tag-to-code tag)]
       (bsp/write! bos shortcut-code)
@@ -205,26 +224,29 @@
   (write-as! [bos tag o]
     (p/write-as! bos tag o false))
   (write-as! [bos tag o cache]
-    (if cache
-      (if (should-skip-cache o)
-        (p/write-as! bos tag o false)
-        (let [index (.old-index! (.-priority-cache bos) tag)]
-          (cond
-            (== -1 index)
-            (do
-              (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
-              (p/write-as! bos tag o false))
-            (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
-            (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
-            :else
-            (do
-              (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
-              (p/write-int! bos index)))))
-      ((.require-write-handler (.-handlers bos) tag o) bos o)))
+    (do
+      (if cache
+        (if (should-skip-cache o)
+          (p/write-as! bos tag o false)
+          (let [index (.old-index! (.-priority-cache bos) tag)]
+            (cond
+              (== -1 index)
+              (do
+                (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
+                (p/write-as! bos tag o false))
+              (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
+              (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
+              :else
+              (do
+                (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
+                (p/write-int! bos index)))))
+        ((.require-write-handler (.-handlers bos) tag o) bos o))
+      bos))
   (reset-caches! [bos]
     (do
       (.clear-caches! bos)
-      (bsp/write! bos (.-RESET-CACHES c/codes))))
+      (bsp/write! bos (.-RESET-CACHES c/codes))
+      bos))
   (write-footer! [bos]
     (let [length (bsp/bytes-written bos)]
       (do
@@ -232,7 +254,8 @@
         (bsp/write-int32! bos length)
         (bsp/write-int32! bos (bsp/get-checksum bos))
         (bsp/reset! bos)
-        (.clear-caches! bos)))))
+        (.clear-caches! bos)
+        bos))))
 
 (defn read-utf8-chars! [dest source offset length]
   (loop [pos offset]

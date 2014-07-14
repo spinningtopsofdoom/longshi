@@ -261,5 +261,5 @@
 
 (defn byte-input-stream
   ([stream] (byte-input-stream stream #js {}))
-  ([stream user-handlers] (byte-input-stream stream #js {} true))
+  ([stream user-handlers] (byte-input-stream stream user-handlers true))
   ([stream user-handlers use-checksum] (->ByteInputStream stream 0 0 user-handlers fh/core-read-handlers #js [] #js [] use-checksum)))

@@ -1,8 +1,7 @@
 (ns longshi.fressian.handlers
   (:import [goog.math Long])
   (:require [longshi.fressian.protocols :as p]
-            [longshi.fressian.byte-stream :as bs]
-            [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
+            [longshi.fressian.utils :refer [make-byte-array make-data-view little-endian]]))
 
 (def js-int-type #js{})
 (def js-int-type-id (.getUid js/goog js-int-type))
@@ -132,7 +131,7 @@
                uuid-chunks (.match uuid-str (js/RegExp. "[0-9a-fA-F]{1,4}" "g"))]
            (do
              (dotimes [i (alength uuid-chunks)]
-               (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) bs/little-endian))
+               (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) little-endian))
              (p/write-bytes! fw uuid-ba)))))]
      [js/RegExp "regex"
      (fn [fw re]

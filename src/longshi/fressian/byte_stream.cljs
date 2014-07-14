@@ -4,7 +4,7 @@
             [longshi.fressian.handlers :as fh]
             [longshi.fressian.hop-map :as hm]
             [longshi.fressian.codes :as c]
-            [longshi.fressian.utils :refer [make-byte-array make-data-view]]))
+            [longshi.fressian.utils :refer [make-byte-array make-data-view little-endian]]))
 
 (defn adler32
   ([ba] (adler32 ba 1))
@@ -29,7 +29,6 @@
         (aset sums 1 (js-mod (aget sums 1) 65521))
         (unsigned-bit-shift-right (bit-or (bit-shift-left (aget sums 1) 16) (aget sums 0)) 0)))))
 
-(def little-endian false)
 ;;Integer buffer
 (def ^:private i32a (make-byte-array 4))
 (def ^:private i32adv (make-data-view i32a))

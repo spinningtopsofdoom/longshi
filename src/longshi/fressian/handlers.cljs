@@ -12,7 +12,12 @@
     (-write writer (str tag " : [" value "]"))))
 (defn tagged-object [tag value]
   (->TaggedObject tag value nil))
-(deftype TaggedHandler [tag handler])
+(deftype TaggedHandler [tag handler]
+  ILookup
+  (-lookup [th k]
+    (-lookup th k nil))
+  (-lookup [_ k not-found]
+    (if (= k tag) handler not-found)))
 
 (deftype WriteLookup [handlers cnt ^:mutable cache]
   Object
@@ -36,7 +41,7 @@
       cache-handler
       (when-let [chain-handler
                  (loop [i 0]
-                   (if-let [v (aget (aget handlers i) k)]
+                   (if-let [v (get (aget handlers i) k)]
                      v
                      (when (< i cnt)
                        (recur (inc i)))))]
@@ -51,12 +56,18 @@
 
 (defn get-class-id [klass]
   (when-not (nil? klass) (.getUid js/goog klass)))
+(defn obj->lookup [obj]
+  (reify ILookup
+      (-lookup [obj k]
+        (-lookup obj k nil))
+      (-lookup [_ k not-found]
+        (or (aget obj k) not-found))))
 (defn create-handler [handler-data]
   (let [handlers #js {}]
     (doseq [h handler-data]
       (let [[js-type tag handler] h]
         (aset handlers (get-class-id js-type) (TaggedHandler. tag handler))))
-    (.freeze js/Object handlers)))
+    (obj->lookup handlers)))
 
 (defn- int-array-write-handler [fw ia]
   (let [cnt (alength ia)]
@@ -145,7 +156,7 @@
       (throw (js/Error. (str "Value out of range for int: (" i ")"))))
       i))
 (def core-read-handlers
-  (.freeze js/Object
+  (obj->lookup
     #js {
          "boolean[]"
          (fn [fr tag component-count]

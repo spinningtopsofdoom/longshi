@@ -143,7 +143,7 @@
       (set! struct-cache #js [])
       (set! priority-cache #js [])))
   (handle-struct [bis tag fields]
-    (let [rh (or (aget handlers tag) (aget standard-handlers tag))]
+    (let [rh (or (get handlers tag) (get standard-handlers tag))]
       (if rh
         (rh bis tag fields)
         (let [values (make-array fields)]

@@ -1,25 +1,47 @@
 (ns longshi.fressian.handlers
+  "Read and Write handlers and handler data structures"
   (:import [goog.math Long])
   (:require [longshi.fressian.protocols :as p]
             [longshi.fressian.utils :refer [make-byte-array make-data-view little-endian]]))
 
-(def js-int-type #js{})
-(def js-int-type-id (.getUid js/goog js-int-type))
+(def js-int-type #js{}) ;;Internal marker for JavaScript numbers that are integers
+(def js-int-type-id (.getUid js/goog js-int-type)) ;;Marker code for js-int-type
 
-(deftype TaggedObject [tag value meta]
+(deftype
+  ^{:doc
+    "Default value for read values that don't have a handler
+
+    tag (string) - Name of type of value
+    value ([Object]) - Object array containing value fields
+    meta (IMap) - Value metadata (not currently used)"}
+  TaggedObject [tag value meta]
   IPrintWithWriter
   (-pr-writer [_ writer _]
     (-write writer (str tag " : [" value "]"))))
 (defn tagged-object [tag value]
+  "Constructor for tagged object"
   (->TaggedObject tag value nil))
-(deftype TaggedHandler [tag handler]
+(deftype
+  ^{:doc
+    "Lookup value for a fressian tag and handler
+
+    tag (string) - Freesian value Name
+    handler (IFn) - Handler for fressian data of the tags type"}
+  TaggedHandler [tag handler]
   ILookup
   (-lookup [th k]
     (-lookup th k nil))
   (-lookup [_ k not-found]
     (if (= k tag) handler not-found)))
 
-(deftype WriteLookup [handlers cnt ^:mutable cache]
+(deftype
+  ^{:doc
+    "Caching lookup for fressian write handlers
+
+    handlers ([ILookup]) - Array of handler lookups
+    cnt (int) - Number of handlers
+    cache (Object) - Cache for quick handler lookup"}
+  WriteLookup [handlers cnt ^:mutable cache]
   Object
   (require-write-handler [wl tag o]
     (let [js-type-id (cond
@@ -50,11 +72,18 @@
           chain-handler)))))
 
 (defn write-lookup
+  "Constructor for WriteLookup
+
+   handler-list (ISeq) - Sequence of fressian write handler"
   ([& handler-list]
    (let [handlers (into-array handler-list)]
      (WriteLookup. handlers (alength handlers) #js {}))))
 
-(defn get-class-id [klass]
+(defn get-class-id
+  "Converts a JavaScript constructor function to an unique id
+
+  klass (IFn) - Constructor function"
+  [klass]
   (when-not (nil? klass) (.getUid js/goog klass)))
 (defn obj->lookup [obj]
   (reify ILookup
@@ -62,21 +91,35 @@
         (-lookup obj k nil))
       (-lookup [_ k not-found]
         (or (aget obj k) not-found))))
-(defn create-handler [handler-data]
+(defn create-handler
+  "Creates lookup value for write handlers
+  handler-data (ISeq) - Sequence of tuples to generate lookups with
+
+  The handler data is of this form
+  [[<constructor function> <tag name> <write handler>]]"
+  [handler-data]
   (let [handlers #js {}]
     (doseq [h handler-data]
       (let [[js-type tag handler] h]
         (aset handlers (get-class-id js-type) (TaggedHandler. tag handler))))
     (obj->lookup handlers)))
 
-(defn- int-array-write-handler [fw ia]
+(defn- int-array-write-handler
+  "Write handler for JavaScript integer typed arrays
+
+  fw (FreesianWriter) - Fressian write stream the integers will be written to
+  ia (typed array) - Integer typed array to write to the fressian stream"
+  [fw ia]
   (let [cnt (alength ia)]
     (do
       (p/write-tag! fw "int[]" 2)
       (p/write-int! fw cnt)
       (dotimes [i cnt]
         (p/write-int! fw (aget ia i))))))
-(def core-write-handlers
+(def
+  ^{:doc
+    "Write handlers for primitive types, arrays of primitive types, and TaggedObject"}
+  core-write-handlers
   (create-handler
     [[nil "null" (fn [fw _] (p/write-null! fw))]
      [js/Boolean "bool" (fn [fw b] (p/write-boolean! fw b))]
@@ -124,10 +167,16 @@
             (dotimes [i cnt]
               (p/write-object! fw (aget (.-value to) i))))))]
      ]))
-
+;;UUID byte array for transformations from string to byte array
 (def ^:private uuid-ba (make-byte-array 16))
 (def ^:private uuid-dv (make-data-view uuid-ba))
-(def extended-write-handlers
+
+(def
+  ^{:doc
+    "Extended freesian write handlers
+
+    The handlers are for native javascript types (Date and RegExp) and native ClojureScript types (UUID)"}
+  extended-write-handlers
   (create-handler
     [[js/Date "inst"
      (fn [fw d]
@@ -150,12 +199,19 @@
          (p/write-tag! fw "regex" 1)
          (p/write-string! fw (.-source re))))]]))
 
-(defn- int-check [i]
+(defn- int-check
+  "Check if number is within int range (-2 ^ 32 to (2 ^ 32) - 1)
+
+  i (number) - JavaScript number to check"
+  [i]
   (do
     (when-not (and (number? i) (== i (bit-or i 0)))
       (throw (js/Error. (str "Value out of range for int: (" i ")"))))
       i))
-(def core-read-handlers
+(def
+  ^{:doc
+    "Read handlers for arrays of primitive types and extended types"}
+  core-read-handlers
   (obj->lookup
     #js {
          "boolean[]"

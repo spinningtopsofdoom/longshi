@@ -1,4 +1,5 @@
 (ns longshi.fressian.byte-stream
+  "Byte input and output streams along with checksum"
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.handlers :as fh]
@@ -7,6 +8,10 @@
             [longshi.fressian.utils :refer [make-byte-array make-data-view little-endian]]))
 
 (defn adler32
+  "Adler32 checksum algorithm for bytestreams
+
+  ba ([bytes]) - Array of bytes to get the checksum for
+  adler (int) - Checksum value (defaults to 1)"
   ([ba] (adler32 ba 1))
   ([ba adler]
     (let [ba-len (alength ba)
@@ -35,9 +40,21 @@
 ;;Double buffer
 (def ^:private da (make-byte-array 8))
 (def ^:private dadv (make-data-view da))
-(deftype ByteOutputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers ^:mutable struct-cache ^:mutable priority-cache]
+
+(deftype
+  ^{:doc
+    "Output bytestream for fressian writer
+
+    stream ([bytes]) - Byte array to write to.  Double in size when full
+    cnt (int) - The total number of bytes written for the stream
+    checkpoint (int) - The starting pointer to the current fressian bytestream
+    handlers (ILookup) - Map for looking up a values handler
+    struct-cache (InterleavedIndexHopMap) - Cache for the names of value types
+    priority-cache (InterleavedIndexHopMap) - Cache for values written"}
+  ByteOutputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers ^:mutable struct-cache ^:mutable priority-cache]
   Object
   (clear-caches! [bos]
+    "Clears the type and value caches"
     (do
       (set! struct-cache (hm/interleaved-index-hop-map 16))
       (set! priority-cache (hm/interleaved-index-hop-map 16))))
@@ -118,6 +135,10 @@
   (-count [bos] cnt))
 
 (defn byte-output-stream
+  "Creates a fressian output bytestream
+
+  len (int) - The starting length of the internal byte array (defaults to 32)
+  user-handlers (ILookup) - User defined handlers for writing values (defaults to empty lookup)"
   ([] (byte-output-stream 32))
   ([len] (byte-output-stream 32 #js {}))
   ([len user-handlers]
@@ -129,20 +150,45 @@
     (hm/interleaved-index-hop-map 16)
     (hm/interleaved-index-hop-map 16))))
 
-(deftype StructCache [tag fields])
+(deftype
+  ^{:doc
+    "Cache for the structure of types
+    tag (string) - The name of the values type
+    fields (int) - The number of fields the value has"}
+  StructCache [tag fields])
 (defn struct-cache
+  "Constructor for StructCache"
   [tag fields]
   (->StructCache tag fields))
-
+;;Marker object for when reader is constrcuting a value
 (def under-construction #js {})
 
-(deftype ByteInputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers standard-handlers ^:mutable struct-cache  ^:mutable priority-cache use-checksum]
+(deftype
+  ^{:doc
+    "Input bytestream for fressian reader
+
+    stream ([bytes]) - Byte array to read from.
+    cnt (int) - The total number of bytes read from the stream
+    checkpoint (int) - The starting pointer to the current fressian bytestream
+    handlers (ILookup) - User defined map for looking up a values handler
+    standard-handlers (ILookup) - Standard map for looking up a values handler
+    struct-cache ([StructCache]) - Cache for the names of value types
+    priority-cache ([Object]) - Cache for values written
+    use-checksum (bool) - Flag for valdiating the footer checksum" }
+  ByteInputStream [^:mutable stream ^:mutable cnt ^:mutable checkpoint handlers standard-handlers ^:mutable struct-cache  ^:mutable priority-cache use-checksum]
   Object
   (clear-caches! [bos]
+    "Clears the type and value caches"
     (do
       (set! struct-cache #js [])
       (set! priority-cache #js [])))
   (handle-struct [bis tag fields]
+    "Constructs a value for a extended or custom value
+
+     tag (string) - Name of the handler to use for construction
+     fields (int) - The number of fields to read to constuct the value
+
+     If no handler is found a tagged object is returned"
     (let [rh (or (get handlers tag) (get standard-handlers tag))]
       (if rh
         (rh bis tag fields)
@@ -152,6 +198,10 @@
               (aset values i (p/read-object! bis)))
             (fh/tagged-object tag values))))))
   (lookup-cache [bis cache index]
+    "Looks up item in cache
+
+     cache (Array) - Cache to search for item
+     index (int) - Location of cached item"
     (if (< index (alength cache))
       (let [result (aget cache index)]
         (if (identical? under-construction result)
@@ -160,6 +210,9 @@
           ))
        (throw (js/Error. "Requested object beyond end of cache: (" index ")"))))
   (read-and-cache-object [bis cache]
+    "Reads and caches an object
+
+     cache (Array) - Cache the item will be put into"
     (let [index (alength cache)]
       (do
         (.push cache under-construction)
@@ -168,6 +221,13 @@
             (aset cache index o)
             o)))))
   (validate-footer! [bis calculated-length magic-from-string]
+    "Validates the footer
+
+     calculated-length (int) - The length gotten from the footer
+     magic-from-string (int) - The magic footer code
+
+     The validations done are checking the footer code, toe fressian bytestream length,
+     and optionally checking the checksum"
     (let [valid-magic (== magic-from-string (.-FOOTER_MAGIC c/codes))
           stream-length (if valid-magic (bsp/read-int32! bis) -1)
           valid-length (and valid-magic (== stream-length calculated-length))
@@ -182,6 +242,7 @@
         (not valid-checksum)
         (throw (js/Error. (str "Invalid footer checksum expected (" stream-checksum ") and got (" checksum ")"))))))
   (peek-read [bos]
+    "Reads the next byte without changing the pointer"
     (when-not (< (alength stream) cnt)
       (aget stream cnt)))
   bsp/ByteBuffer
@@ -260,6 +321,11 @@
   (-count [bis] (alength stream)))
 
 (defn byte-input-stream
+  "Creates a fressian input bytestream
+
+  stream ([byte]) - Byte array to read the fressian datas from
+  user-handlers (ILookup) - User defined read handlers (defaults to empty lookup)
+  use-checksum (bool) - Validate the checksum when validating footer (defaults to true)"
   ([stream] (byte-input-stream stream #js {}))
   ([stream user-handlers] (byte-input-stream stream user-handlers true))
   ([stream user-handlers use-checksum] (->ByteInputStream stream 0 0 user-handlers fh/core-read-handlers #js [] #js [] use-checksum)))

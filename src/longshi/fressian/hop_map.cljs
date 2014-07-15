@@ -1,13 +1,26 @@
-(ns longshi.fressian.hop-map)
+(ns longshi.fressian.hop-map
+  "Caching map optimized for converting a value to an integer")
 ;; map from a value to a 32 bit integer
-(deftype InterleavedIndexHopMap [^:mutable cap ^:mutable cnt ^:mutable hop-idx ^:mutable ks]
+(deftype
+  ^{:doc
+    "Caching map that maps keys to positive integers
+
+    cap (int) - Capacity of the map.  When it's full the map will resize
+    cnt (int) - Number of items in the map
+    hop-idx (Uint32Array) - Array of object hashes
+    ks ([Object]) Array of keys for the map"}
+  InterleavedIndexHopMap [^:mutable cap ^:mutable cnt ^:mutable hop-idx ^:mutable ks]
   Object
   (hash [_ obj]
+    "Gets a hash of an Object
+
+     The hash is an unsigned 32 bit integer"
      (let [h (bit-shift-right-zero-fill (hash obj) 0)]
        (if (== h 0)
          42
          h)))
   (find-slot [_ h]
+    "Finds a new slot in hop-idx during resize"
     (let [mask (dec cap)
           bkt (bit-and h mask)
           bhash (aget hop-idx (bit-shift-left bkt 2))]
@@ -18,6 +31,7 @@
             (+ 2 (bit-shift-left bkt 2))
             (recur (bit-and mask (inc bkt))))))))
   (resize [this]
+    "Resizes the map"
     (let [old-hop-idx hop-idx
           old-hop-idx-len (.-length old-hop-idx)
           old-keys ks]
@@ -32,6 +46,12 @@
                 (.set hop-idx (.subarray old-hop-idx slot (+ 2 slot)) new-slot)
                 (recur (+ 2 slot)))))))))
   (intern! [this k]
+    "Associates the key with a positive integer
+
+     k (object) - Value to be mapped to a positive integer
+
+     If k is in the map the positive integer it's assigned to is returned.  Otherwise
+     k is associated with the current value of cnt and cnt is incremented."
     (let [h (.hash this k)
           mask (dec cap)
           bkt (bit-and h mask)
@@ -71,12 +91,19 @@
                         (.resize this))
                       i)))))))))
   (old-index! [this k]
+    "Associates the key with a positive integer
+
+     k (object) - Value to be mapped to a positive integer
+
+     If k is in the map then the positive integer associated with it is returned.  Otherwise
+     k is added to the map and -1 is returned."
     (let [cnt-before cnt
           idx (.intern! this k)]
       (if (== cnt cnt-before)
         idx
         -1)))
   (clear! [_]
+    "Removes all associations from the map and sets cnt to zero"
     (let [cap2 (bit-shift-left cap 2)]
      (do
       (set! cnt 0)
@@ -91,6 +118,7 @@
             (aset hop-idx n 0)
             (recur (inc n)))))))
   (get [this k]
+    "Get the value of key or -1 if it isn't in the map"
     (let [h (.hash this k)
           mask (dec cap)
           bkt (bit-and h mask)
@@ -119,6 +147,9 @@
   (-count [_] cnt))
 
 (defn interleaved-index-hop-map
+  "Constructor for InterleavedIndexHopMap
+
+  capacity (int) - The capacity of the map (defauls to 1024)"
   ([] (interleaved-index-hop-map 1024))
   ([capacity]
     (let [cap

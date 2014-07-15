@@ -1,4 +1,5 @@
-(ns longshi.fressian.codes)
+(ns longshi.fressian.codes
+  "Maps of fressian byte codes and of tag to byte codes")
 
 (def codes
   #js {

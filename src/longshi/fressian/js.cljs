@@ -1,4 +1,5 @@
 (ns longshi.fressian.js
+  "Adding fressian writers and reader protocols to input and output bytestreams"
   (:import [goog.math Long]
            [goog.string StringBuffer])
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
@@ -14,7 +15,13 @@
 (def ^:private two-power-24 (bit-shift-left 1 24))
 (def ^:private two-power-32 (* two-power-16 two-power-16))
 ;;Integer helpers
-(defn bit-switch [x]
+(defn bit-switch
+  "Gets the 64 minus the number of bits needed for the number
+
+  x (Long) - Google Closure Long (for perf reasons) to get the bits of
+
+  -1 and 0 return 64."
+  [x]
   (cond
     (or (.equals Long.ONE x) (.equals Long.NEG_ONE x)) 64
     :else
@@ -22,7 +29,12 @@
       (- 64 (.getNumBitsAbs (.not x)))
       (- 64 (.getNumBitsAbs x)))))
 
-(defn string-chunk-utf8! [s start buffer]
+(defn string-chunk-utf8!
+  "Writes up to 64K bytes of a string
+  s (string) - String that will be written to buffer
+  start (int) - The location in the buffer to start writing to
+  buffer (Array) - Buffer containing the strings bytes"
+  [s start buffer]
   (loop [str-pos start buf-pos 0]
     (let [ch (.charCodeAt s str-pos)
           ch-enc-size (cond
@@ -43,7 +55,11 @@
           (recur (inc str-pos) (+ buf-pos ch-enc-size)))
         #js [str-pos buf-pos]))))
 
-(defn- should-skip-cache [o]
+(defn- should-skip-cache
+  "Check if the value is to small for cache to be effective
+
+  o (object) - Value to check"
+  [o]
   (cond
     (or (nil? o) (identical? js/Boolean (.-constructor o))) true
     (and (number? o) (== 1 (js-mod o 1)) (< -255 o 255)) true
@@ -257,7 +273,14 @@
         (.clear-caches! bos)
         bos))))
 
-(defn read-utf8-chars! [dest source offset length]
+(defn read-utf8-chars!
+  "Reads bytes from a source buffer and appends then to a destination buffer
+
+  dest (StringBuffer) - Buffer to write string characters to
+  source ([byte]) - Byte buffer to read characters from
+  offset (int) - The starting point to read from source
+  length (int) - How many bytes to read from source"
+  [dest source offset length]
   (loop [pos offset]
     (when-let [ch (aget source pos)]
       (case (bit-shift-right ch 4)
@@ -289,7 +312,12 @@
             (recur (+ 3 pos))))
         (throw (js/Error. (str "Invalid UTF Character (" ch ")")))))))
 
-(defn read-string-buffer! [bis string-buffer byte-len]
+(defn read-string-buffer!
+  "Reads a string from a byte array
+  bis (ByteInputStream) - Fressian input stream to get bytes from
+  string-buffer (StringBuffer) - Buffer to append string to
+  byte-len (int) - The number of bytes to read from the bytestream"
+  [bis string-buffer byte-len]
   (let [byte-buffer (make-byte-array byte-len)]
     (do
       (bsp/read-bytes! bis byte-buffer 0 byte-len)

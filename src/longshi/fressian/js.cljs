@@ -247,7 +247,7 @@
       (if cache
         (if (should-skip-cache o)
           (p/write-as! bos tag o false)
-          (let [index (.old-index! (.-priority-cache bos) tag)]
+          (let [index (.old-index! (.-priority-cache bos) o)]
             (cond
               (== -1 index)
               (do

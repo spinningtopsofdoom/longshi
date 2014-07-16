@@ -163,7 +163,6 @@
         (let [cnt (alength (.-value to))]
           (do
             (p/write-tag! fw (.-tag to) cnt)
-            (p/write-int! fw cnt)
             (dotimes [i cnt]
               (p/write-object! fw (aget (.-value to) i))))))]
      ]))

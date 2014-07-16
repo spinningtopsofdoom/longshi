@@ -23,6 +23,21 @@
   (->TaggedObject tag value nil))
 (deftype
   ^{:doc
+    "Type for writitng out non native JavaScript Arrays
+
+    tag (string) - Name of type of the array
+    value (array) - Array containing values that are the same type
+
+    This is for boolean and long arrays"}
+  TaggedArray [tag value]
+  IPrintWithWriter
+  (-pr-writer [_ writer _]
+    (-write writer (str tag " : [" value "]"))))
+(defn tagged-array [tag value]
+  "Constructor for tagged array"
+  (->TaggedArray tag value))
+(deftype
+  ^{:doc
     "Lookup value for a fressian tag and handler
 
     tag (string) - Freesian value Name
@@ -165,7 +180,15 @@
             (p/write-tag! fw (.-tag to) cnt)
             (dotimes [i cnt]
               (p/write-object! fw (aget (.-value to) i))))))]
-     ]))
+
+     [TaggedArray "any"
+      (fn [fw ta]
+        (let [cnt (alength (.-value ta))]
+          (do
+            (p/write-tag! fw (.-tag ta) 2)
+            (p/write-int! fw cnt)
+            (dotimes [i cnt]
+              (p/write-object! fw (aget (.-value ta) i))))))]]))
 ;;UUID byte array for transformations from string to byte array
 (def ^:private uuid-ba (make-byte-array 16))
 (def ^:private uuid-dv (make-data-view uuid-ba))

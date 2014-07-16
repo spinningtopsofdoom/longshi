@@ -214,9 +214,11 @@
               (seqable? l) (seq l))
             length (count l)]
         (do
-          (if (< length (.-LIST_PACKED_LENGTH_END c/codes))
+          (if (< length (.-LIST_PACKED_LENGTH_END c/ranges))
             (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
-            (bsp/write! bos (.-LIST c/codes)))
+            (do
+              (bsp/write! bos (.-LIST c/codes))
+              (p/write-int! bos length)))
           (doseq [li l]
             (p/write-object! bos li))))
       bos))
@@ -597,7 +599,7 @@
             oa))
         ((.-LIST c/codes))
         (let [oa #js []
-              length (bsp/read-int32! bis)]
+              length (p/read-object! bis)]
           (do
             (dotimes [i length]
               (.push oa (p/read-object! bis)))

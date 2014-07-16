@@ -8,6 +8,9 @@
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]
             [longshi.fressian.byte-stream :as bs]))
 
+(extend-protocol p/CachedObject
+  default
+  (cache? [_] false))
 ;;Integer constants
 (def ^:private max-neg-js-hb-int (bit-shift-left -1 21))
 (def ^:private max-pos-js-hb-int (dec (bit-shift-left 1 21)))
@@ -236,7 +239,7 @@
   (write-object! [bos o]
     (p/write-object! bos o false))
   (write-object! [bos o cache]
-    (p/write-as! bos nil o cache))
+    (p/write-as! bos nil o (or cache (p/cache? o))))
   (write-as! [bos tag o]
     (p/write-as! bos tag o false))
   (write-as! [bos tag o cache]

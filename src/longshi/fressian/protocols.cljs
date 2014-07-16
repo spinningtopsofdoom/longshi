@@ -133,3 +133,8 @@
 
      The validations performed are checking the footer marker, the bytestream length, and optionally
      the checksum"))
+
+(defprotocol CachedObject
+  "Fressian Caching protocol"
+  (cache? [co]
+    "Check to see if the value is to be cached"))

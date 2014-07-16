@@ -225,13 +225,32 @@
   (println ro)))
 ;;Encoding / decoding cached values
 (def long-str (.join (make-array 1024) "a"))
+(extend-type string
+  ICloneable
+  (-clone [s] (js/String. s)))
+(def cache-str
+  (specify long-str
+   p/CachedObject
+   (cache? [_]  true)))
 
-(let [bos (bs/byte-output-stream 2 my-write-handlers)]
+(let [bos (bs/byte-output-stream 2 my-write-handlers)
+      stream-sizes (atom {})
+      add-stream-size
+      (fn [name] (swap! stream-sizes #(into %1 [[name %2]]) (count bos)))]
   (p/write-object! bos long-str true)
+  (add-stream-size :first-long-str-write)
   (p/write-object! bos long-str true)
+  (add-stream-size :second-long-str-write)
   (p/reset-caches! bos)
   (p/write-object! bos long-str true)
+  (add-stream-size :first-long-str-write-after-cache-reset)
   (p/write-object! bos long-str true)
+  (add-stream-size :second-long-str-write-after-cache-reset)
+  (p/reset-caches! bos)
+  (p/write-object! bos cache-str)
+  (add-stream-size :first-cached-str-write)
+  (p/write-object! bos cache-str)
+  (add-stream-size :second-cached-str-write)
   (let [bis (bs/byte-input-stream (bsp/get-bytes bos) my-read-handlers)
         ro (vector
             (p/read-object! bis)
@@ -239,7 +258,8 @@
             (p/read-object! bis)
             (p/read-object! bis)
             )]
-  (println ro)))
+  (println ro)
+  (println @stream-sizes)))
 ;;Encoding / decoding footers
 (let [bos (bs/byte-output-stream 2)]
   (do

@@ -13,4 +13,10 @@
                                    :output-to "longshi.js"
                                    :output-dir "out"
                                    :optimizations :none
-                                   :source-map true}}]})
+                                   :source-map true}}
+                      {:id "tests"
+                       :source-paths ["src" "test"]
+                       :compiler {:optimizations :none
+                                  :source-map true
+                                  :output-dir "target/test"
+                                  :output-to "target/test/longshi_test.js"}}]})

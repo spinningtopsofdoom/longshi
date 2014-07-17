@@ -225,13 +225,7 @@
   (println ro)))
 ;;Encoding / decoding cached values
 (def long-str (.join (make-array 1024) "a"))
-(extend-type string
-  ICloneable
-  (-clone [s] (js/String. s)))
-(def cache-str
-  (specify long-str
-   p/CachedObject
-   (cache? [_]  true)))
+(def cache-str (bjs/cache long-str))
 
 (let [bos (bs/byte-output-stream 2 my-write-handlers)
       stream-sizes (atom {})

@@ -8,9 +8,6 @@
             [longshi.fressian.utils :refer [make-byte-array make-data-view]]
             [longshi.fressian.byte-stream :as bs]))
 
-(extend-protocol p/CachedObject
-  default
-  (cache? [_] false))
 ;;Integer constants
 (def ^:private max-neg-js-hb-int (bit-shift-left -1 21))
 (def ^:private max-pos-js-hb-int (dec (bit-shift-left 1 21)))
@@ -68,6 +65,20 @@
     (and (number? o) (== 1 (js-mod o 1)) (< -255 o 255)) true
     (and (string? o) (zero? (.-length o))) true
     :else false))
+
+(deftype
+  ^{:doc
+   "Wrapper object for caching
+
+   co (object) - Object to be cached in the fressian stream"}
+  CachedObject [co]
+  p/Cached
+  (cached-value [_] co))
+
+(defn cache
+  "Creates a cached object"
+  [o]
+  (CachedObject. o))
 
 (extend-type bs/ByteOutputStream
   p/StreamingWriter
@@ -243,28 +254,30 @@
   (write-object! [bos o]
     (p/write-object! bos o false))
   (write-object! [bos o cache]
-    (p/write-as! bos nil o (or cache (p/cache? o))))
+    (p/write-as! bos nil o cache))
   (write-as! [bos tag o]
     (p/write-as! bos tag o false))
   (write-as! [bos tag o cache]
-    (do
-      (if cache
-        (if (should-skip-cache o)
-          (p/write-as! bos tag o false)
-          (let [index (.old-index! (.-priority-cache bos) o)]
-            (cond
-              (== -1 index)
-              (do
-                (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
-                (p/write-as! bos tag o false))
-              (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
-              (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
-              :else
-              (do
-                (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
-                (p/write-int! bos index)))))
-        ((.require-write-handler (.-handlers bos) tag o) bos o))
-      bos))
+    (let [co (if (instance? CachedObject o) (p/cached-value o) o)
+          is-cache (or cache (instance? CachedObject o))]
+      (do
+        (if is-cache
+          (if (should-skip-cache co)
+            (p/write-as! bos tag co false)
+            (let [index (.old-index! (.-priority-cache bos) co)]
+              (cond
+                (== -1 index)
+                (do
+                  (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
+                  (p/write-as! bos tag co false))
+                (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
+                (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
+                :else
+                (do
+                  (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
+                  (p/write-int! bos index)))))
+          ((.require-write-handler (.-handlers bos) tag co) bos co))
+        bos)))
   (reset-caches! [bos]
     (do
       (.clear-caches! bos)

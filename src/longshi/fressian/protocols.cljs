@@ -134,7 +134,7 @@
      The validations performed are checking the footer marker, the bytestream length, and optionally
      the checksum"))
 
-(defprotocol CachedObject
+(defprotocol Cached
   "Fressian Caching protocol"
-  (cache? [co]
-    "Check to see if the value is to be cached"))
+  (cached-value [co]
+    "Gets the value from the cache"))

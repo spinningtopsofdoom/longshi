@@ -15,19 +15,39 @@
 (def ^:private two-power-24 (bit-shift-left 1 24))
 (def ^:private two-power-32 (* two-power-16 two-power-16))
 ;;Integer helpers
-(defn bit-switch
+(def zero-table #js [31 22 30 21 18 10 29 2 20 17 15 13 9 6 28 1 23 19 11 3 16 14 7 24 12 4 8 25 5 26 27 0])
+(defn leading-zeros [v]
+  "finds the number of zeros before the most significant bit
+
+  x (int) - Positive integer to get the number of leading zeros
+
+  This is based off of an algorithm of finding the most significant bit
+  http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn
+  "
+  (let [x (loop [x v y 1]
+            (if (<= y 16)
+              (recur (bit-or x (bit-shift-right x y)) (bit-shift-left y 1))
+              x))]
+    (aget zero-table (unsigned-bit-shift-right (* x 0x07C4ACDD) 27))))
+(defn bit-switch [x]
   "Gets the 64 minus the number of bits needed for the number
 
   x (Long) - Google Closure Long (for perf reasons) to get the bits of
 
   -1 and 0 return 64."
-  [x]
   (cond
-    (or (.equals Long.ONE x) (.equals Long.NEG_ONE x)) 64
-    :else
-    (if (neg? x)
-      (- 64 (.getNumBitsAbs (.not x)))
-      (- 64 (.getNumBitsAbs x)))))
+    (== 0 (.-low_ x) (.-high_ x)) 64
+    (== -1 (.-low_ x) (.-high_ x)) 64
+    (neg? (.-high_ x))
+    (let [low (bit-not (.-low_ x))
+          high (bit-not (.-high_ x))
+          high-zeros (if (zero? high) 32 0)
+          leading-bits (if (zero? high) low high)]
+      (+ high-zeros (leading-zeros leading-bits)))
+   :else
+   (let [high-zeros (if (zero? (.-high_ x)) 32 0)
+         leading-bits (if (zero? (.-high_ x)) (.-low_ x) (.-high_ x))]
+     (+ high-zeros (leading-zeros leading-bits)))))
 
 (defn string-chunk-utf8!
   "Writes up to 64K bytes of a string

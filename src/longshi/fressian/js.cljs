@@ -5,7 +5,7 @@
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.codes :as c]
-            [longshi.fressian.utils :refer [make-byte-array make-data-view make-string-writer]]
+            [longshi.fressian.utils :refer [make-byte-array make-data-view make-string-writer make-string-reader]]
             [longshi.fressian.byte-stream :as bs]))
 
 ;;Integer constants
@@ -290,46 +290,7 @@
         (.clear-caches! bos)
         bos))))
 
-(defn read-utf8-chars!
-  "Reads bytes from a source buffer and appends then to a destination buffer
-
-  dest (StringBuffer) - Buffer to write string characters to
-  source ([byte]) - Byte buffer to read characters from
-  offset (int) - The starting point to read from source
-  length (int) - How many bytes to read from source"
-  [dest source offset length]
-  (loop [pos offset]
-    (when-let [ch (aget source pos)]
-      (let [bsch (bit-shift-right ch 4)]
-        (cond
-          (<= 0 bsch 7)
-          (do
-            (.append dest (.fromCharCode js/String ch))
-            (recur (inc pos)))
-          (<= 12 bsch 13)
-          (let [ch1 (aget source (inc pos))]
-            (do
-              (.append
-                dest
-                (.fromCharCode
-                  js/String
-                  (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6))))
-              (recur (+ 2 pos))))
-          (== bsch 14)
-          (let [ch1 (aget source (inc pos))
-                ch2 (aget source (+ 2 pos))]
-            (do
-              (.append
-                dest
-                (.fromCharCode
-                  js/String
-                  (bit-or
-                    (bit-and ch2 0x3f)
-                    (bit-shift-left (bit-and ch1 0x3f) 6)
-                    (bit-shift-left (bit-and ch 0x0f) 12))))
-              (recur (+ 3 pos))))
-          :else
-          (throw (js/Error. (str "Invalid UTF Character (" ch ")"))))))))
+(def string-reader (make-string-reader))
 
 (defn read-string-buffer!
   "Reads a string from a byte array
@@ -337,10 +298,9 @@
   string-buffer (StringBuffer) - Buffer to append string to
   byte-len (int) - The number of bytes to read from the bytestream"
   [bis string-buffer byte-len]
-  (let [byte-buffer (make-byte-array byte-len)]
     (do
-      (bsp/read-bytes! bis byte-buffer 0 byte-len)
-      (read-utf8-chars! string-buffer byte-buffer 0 byte-len))))
+      (bsp/read-bytes! bis (.get-buffer string-reader) 0 byte-len)
+      (.read-utf8-chars string-reader string-buffer 0 byte-len)))
 
 (extend-type bs/ByteInputStream
   p/FressianReader

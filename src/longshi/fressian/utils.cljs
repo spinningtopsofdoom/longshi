@@ -44,6 +44,54 @@
 (defn make-string-writer []
   (StringWriter. (make-array 16384) (js/Uint8Array. 65536)))
 
+(deftype StringReader [buffer read-codes]
+  Object
+  (bytes-to-codes [_ offset length]
+    (loop [i 0 pos offset]
+      (if (< pos length)
+        (let [ch (aget buffer pos)]
+          (let [bsch (bit-shift-right ch 4)]
+            (cond
+              (<= 0 bsch 7)
+              (do
+                (aset read-codes i ch)
+                (recur (inc i) (inc pos)))
+              (<= 12 bsch 13)
+              (let [ch1 (aget buffer (inc pos))]
+                (do
+                  (aset read-codes i
+                    (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
+                  (recur (inc i) (+ 2 pos))))
+              (== bsch 14)
+              (let [ch1 (aget buffer (inc pos))
+                    ch2 (aget buffer (+ 2 pos))]
+                (do
+                  (aset read-codes i
+                    (bit-or
+                      (bit-and ch2 0x3f)
+                      (bit-shift-left (bit-and ch1 0x3f) 6)
+                      (bit-shift-left (bit-and ch 0x0f) 12)))
+                  (recur (inc i) (+ 3 pos))))
+              :else
+              (throw (js/Error. (str "Invalid UTF Character (" ch ")"))))))
+        i)))
+
+  (chars-to-str [_ string-buffer chars-length]
+    (loop [i 0]
+      (when (< i chars-length)
+        (do
+          (.append string-buffer (.fromCharCode js/String (aget read-codes i)))
+          (recur (inc i))))))
+
+  (get-buffer [_] buffer)
+
+  (read-utf8-chars [sr string-buffer offset length]
+    (let [str-length (.bytes-to-codes sr offset length)]
+      (.chars-to-str sr string-buffer str-length))))
+
+(defn make-string-reader []
+  (StringReader. (js/Uint8Array. 65536) (make-array 21846)))
+
 (def ^{:doc "Marker for the endianess of bytestreams"}
   little-endian false)
 

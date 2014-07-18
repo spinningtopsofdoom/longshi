@@ -5,7 +5,7 @@
   (:require [longshi.fressian.byte-stream-protocols :as bsp]
             [longshi.fressian.protocols :as p]
             [longshi.fressian.codes :as c]
-            [longshi.fressian.utils :refer [make-byte-array make-data-view]]
+            [longshi.fressian.utils :refer [make-byte-array make-data-view make-string-writer]]
             [longshi.fressian.byte-stream :as bs]))
 
 ;;Integer constants
@@ -29,6 +29,7 @@
               (recur (bit-or x (bit-shift-right x y)) (bit-shift-left y 1))
               x))]
     (aget zero-table (unsigned-bit-shift-right (* x 0x07C4ACDD) 27))))
+
 (defn bit-switch [x]
   "Gets the 64 minus the number of bits needed for the number
 
@@ -49,31 +50,7 @@
          leading-bits (if (zero? (.-high_ x)) (.-low_ x) (.-high_ x))]
      (+ high-zeros (leading-zeros leading-bits)))))
 
-(defn string-chunk-utf8!
-  "Writes up to 64K bytes of a string
-  s (string) - String that will be written to buffer
-  start (int) - The location in the buffer to start writing to
-  buffer (Array) - Buffer containing the strings bytes"
-  [s start buffer]
-  (loop [str-pos start buf-pos 0]
-    (let [ch (.charCodeAt s str-pos)
-          ch-enc-size (cond
-                        (<= ch 0x007f) 1
-                        (> ch 0x07ff) 3
-                          :else 2)]
-      (if (and (< str-pos (alength s)) (<= (+ buf-pos ch-enc-size) (alength buffer)))
-        (do
-          (cond
-            (== ch-enc-size 1) (aset buffer buf-pos ch)
-            (== ch-enc-size 2) (do
-                (aset buffer buf-pos (bit-or (bit-and (bit-shift-right ch 6) 0x1f) 0xc0))
-                (aset buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right ch 0) 0x3f) 0x80)))
-            (== ch-enc-size 3) (do
-                (aset buffer buf-pos (bit-or (bit-and (bit-shift-right ch 12) 0x0f) 0xe0))
-                (aset buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right ch 6) 0x3f) 0x80))
-                (aset buffer (+ 2 buf-pos) (bit-or (bit-and (bit-shift-right ch 0) 0x3f) 0x80))))
-          (recur (inc str-pos) (+ buf-pos ch-enc-size)))
-        #js [str-pos buf-pos]))))
+(def string-writer (make-string-writer))
 
 (defn- should-skip-cache
   "Check if the value is to small for cache to be effective
@@ -135,16 +112,16 @@
       (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes)))
       bos))
   (write-string! [bos s]
-    (let [max-bytes (Math/min (* (alength s) 3) 65536)
-          sba (make-byte-array max-bytes)]
+    (let [str-length (alength s)
+          sba (.get-buffer string-writer)]
       (do
         (loop [str-pos 0]
-          (let [sa (string-chunk-utf8! s str-pos sba)
-                new-str-pos (aget sa 0)
+          (let [sa (.string-chunk-utf8 string-writer s str-pos str-length)
+                new-str-pos (+ str-pos (aget sa 0))
                 buf-pos (aget sa 1)]
             (cond
               (< buf-pos (.-STRING_PACKED_LENGTH_END c/ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START c/codes) buf-pos))
-              (== new-str-pos (alength s))
+              (== new-str-pos str-length)
                 (do
                   (bsp/write! bos (.-STRING c/codes))
                   (p/write-int! bos buf-pos))
@@ -153,7 +130,7 @@
                   (bsp/write! bos (.-STRING_CHUNK c/codes))
                   (p/write-int! bos buf-pos)))
             (bsp/write-bytes! bos sba 0 buf-pos)
-            (if (< new-str-pos (alength s))
+            (if (< new-str-pos str-length)
               (recur new-str-pos))))
         bos)))
   (write-bytes! [bos b]

@@ -1,9 +1,21 @@
 (ns longshi.fressian.utils
   "Utility data and functions for byte arrays")
 
-(deftype StringWriter [code-pipe string-buffer]
+(deftype
+  ^{:doc
+    "Object for grouping string writing methods and data together
+
+    code-pipe ([int]) - Pre allocated buffer for holding character codes
+    string-buffer ([bytes]) - Pre allocated buffer holding the converted character codes"}
+  StringWriter [code-pipe string-buffer]
+
   Object
   (string-to-codes [_ s start-pos end-pos]
+    "Converts a string into an array of character codes
+
+    s (string) - String to convert to character codes
+    start-pos (int) - The starting position to start reading from the string
+    end-pos (int) - The position to stop reading from the string"
     (loop [i 0 str-pos start-pos]
       (when (< str-pos end-pos)
         (do
@@ -11,6 +23,10 @@
           (recur (inc i) (inc str-pos))))))
 
  (write-str-bytes [_ str-length buf-length]
+   "Writes out character codes to bytes
+
+    str-length (int) - The length of the portion of the string we are reading
+    buf-length (int) - The length of the buffer we are writing to"
    (loop [i 0 buf-pos 0]
      (let [code (aget code-pipe i)
            byte-size (cond (<= code 0x007f) 1 (> code 0x07ff) 3 :else 2)]
@@ -31,22 +47,42 @@
           (recur (inc i) (+ buf-pos byte-size)))
           #js [i buf-pos]))))
 
-  (string-chunk-utf8
-    [sw s start total-str-length buffer]
+  (string-chunk-utf8 [sw s start total-str-length buffer]
+    "Converts a string to a buffer with a maximum size of 64k
+
+     s (string) - The string we are converting to bytes
+     start (int) - The index to start reading from the string
+     total-str-length (int) - The total length of the string
+     buffer ([byte]) - The buffer we are writing to"
     (let [str-length (Math/min 21846 (- total-str-length start))
           buf-length (Math/min 65536 (* 3 str-length))]
       (do
         (.string-to-codes sw s start (+ start str-length))
         (.write-str-bytes sw str-length buf-length))))
 
-  (get-buffer [_] string-buffer))
+  (get-buffer [_]
+    "Gets the string buffer"
+    string-buffer))
 
-(defn make-string-writer []
+(defn make-string-writer
+  "Convience method for making a string writer"
+  []
   (StringWriter. (make-array 16384) (js/Uint8Array. 65536)))
 
-(deftype StringReader [buffer read-codes]
+(deftype
+  ^{:doc
+    "Object for grouping string reading methods and data together
+
+    buffer ([bytes]) - Pre allocated buffer for reading in string buffers
+    read-codes ([int]) - Pre allocated buffer holding the character codes"}
+  StringReader [buffer read-codes]
+
   Object
   (bytes-to-codes [_ offset length]
+    "Converts string buffer to character codes
+
+     offset (int) - Starting point to read the buffer
+     length (int) - The number of bytes to read"
     (loop [i 0 pos offset]
       (if (< pos length)
         (let [ch (aget buffer pos)]
@@ -77,19 +113,31 @@
         i)))
 
   (chars-to-str [_ string-buffer chars-length]
+    "Converts character codes to characters and appends them to a string buffer
+
+     string-buffer (StringBuffer) - Google String buffer to append characters to
+     chars-length (int) - The number of characters we are appending"
     (loop [i 0]
       (when (< i chars-length)
         (do
           (.append string-buffer (.fromCharCode js/String (aget read-codes i)))
           (recur (inc i))))))
 
-  (get-buffer [_] buffer)
+  (get-buffer [_]
+    "Gets the string buffer"
+    buffer)
 
   (read-utf8-chars [sr string-buffer offset length]
+    "Reads in a string buffer and appends the characters to a string
+
+     string-buffer (StringBuffer) Google string buffer we'll append characters to
+     offset (int) - Starting point to read the string buffer
+     length (int) - The number of bytes to read"
     (let [str-length (.bytes-to-codes sr offset length)]
       (.chars-to-str sr string-buffer str-length))))
 
 (defn make-string-reader []
+  "Convience method for making a string reader"
   (StringReader. (js/Uint8Array. 65536) (make-array 21846)))
 
 (def ^{:doc "Marker for the endianess of bytestreams"}

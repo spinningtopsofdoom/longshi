@@ -67,7 +67,7 @@
 (defn make-string-writer
   "Convience method for making a string writer"
   []
-  (StringWriter. (make-array 16384) (js/Uint8Array. 65536)))
+  (StringWriter. (array) (js/Uint8Array. 65536)))
 
 (deftype
   ^{:doc
@@ -138,7 +138,7 @@
 
 (defn make-string-reader []
   "Convience method for making a string reader"
-  (StringReader. (js/Uint8Array. 65536) (make-array 21846)))
+  (StringReader. (js/Uint8Array. 65536) (array)))
 
 (def ^{:doc "Marker for the endianess of bytestreams"}
   little-endian false)

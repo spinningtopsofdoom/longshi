@@ -32,14 +32,14 @@
            byte-size (cond (<= code 0x007f) 1 (> code 0x07ff) 3 :else 2)]
        (if (and (< i str-length) (<= (+ buf-pos byte-size) buf-length))
          (do
-           (cond
-             (== byte-size 1)
+           (case byte-size
+             1
              (aset string-buffer buf-pos code)
-             (== byte-size 2)
+             2
              (do
                  (aset string-buffer buf-pos (bit-or (bit-and (bit-shift-right code 6) 0x1f) 0xc0))
                  (aset string-buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right code 0) 0x3f) 0x80)))
-             (== byte-size 3)
+             3
             (do
                 (aset string-buffer buf-pos (bit-or (bit-and (bit-shift-right code 12) 0x0f) 0xe0))
                 (aset string-buffer (inc buf-pos) (bit-or (bit-and (bit-shift-right code 6) 0x3f) 0x80))
@@ -87,18 +87,18 @@
       (if (< pos length)
         (let [ch (aget buffer pos)]
           (let [bsch (bit-shift-right ch 4)]
-            (cond
-              (<= 0 bsch 7)
+            (case bsch
+              (1 2 3 4 5 6 7)
               (do
                 (aset read-codes i ch)
                 (recur (inc i) (inc pos)))
-              (<= 12 bsch 13)
+              (12 13)
               (let [ch1 (aget buffer (inc pos))]
                 (do
                   (aset read-codes i
                     (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
                   (recur (inc i) (+ 2 pos))))
-              (== bsch 14)
+              14
               (let [ch1 (aget buffer (inc pos))
                     ch2 (aget buffer (+ 2 pos))]
                 (do
@@ -108,7 +108,6 @@
                       (bit-shift-left (bit-and ch1 0x3f) 6)
                       (bit-shift-left (bit-and ch 0x0f) 12)))
                   (recur (inc i) (+ 3 pos))))
-              :else
               (throw (js/Error. (str "Invalid UTF Character (" ch ")"))))))
         i)))
 

@@ -1,4 +1,4 @@
-(defproject longshi "0.1.1"
+(defproject longshi "0.1.2"
   :description "Fressian for ClojureScript"
   :url "http://github.com/spinningtopsofdoom/longshi"
   :dependencies [[org.clojure/clojure "1.5.1"]

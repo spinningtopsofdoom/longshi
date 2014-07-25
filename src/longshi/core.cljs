@@ -159,13 +159,13 @@
      (read-object reader))
    "map"
    (fn [reader tag component-count]
-     (apply hash-map (read-object reader)))
+     (cljs.core/PersistentArrayMap.fromArray (read-object reader)))
    "set"
    (fn [reader tag component-count]
-     (into #{} (read-object reader)))
+     (cljs.core/PersistentHashSet.fromArray (read-object reader)))
    "vector"
    (fn [reader tag component-count]
-     (into [] (read-object reader)))})
+     (cljs.core/PersistentVector.fromArray (read-object reader)))})
 (defn create-reader [input-stream & {:keys [handlers checksum?]}]
   "Creates a fressian reader
 

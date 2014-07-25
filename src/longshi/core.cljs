@@ -78,14 +78,26 @@
               (recur (rest map-seq) (+ i 2))))))
       (write-list writer map-list))))
 
-(defn seq-write-handler [writer name cljs-seq]
-  "Writes out a purely sequential ClojureScript type
+(def list-write-handler
+  {"list"
+   (fn [writer cljs-seq]
+     (do
+      (write-tag writer "list" 1)
+      (write-list writer cljs-seq)))})
 
-  writer (FressianWriter) - Fressian Writer for the record
-  cljs-seq (ISeq) - ClojureScript sequence to be written"
-  (do
-    (write-tag writer name 1)
-    (write-list writer cljs-seq)))
+(def vector-write-handler
+  {"vector"
+   (fn [writer cljs-seq]
+     (do
+      (write-tag writer "vector" 1)
+      (write-list writer cljs-seq)))})
+
+(def set-write-handler
+  {"set"
+   (fn [writer cljs-seq]
+     (do
+      (write-tag writer "set" 1)
+      (write-list writer cljs-seq)))})
 ;;ClojureScript base writers
 (def clojure-write-handlers
   {Keyword
@@ -104,21 +116,78 @@
         (write-object writer (namespace k) true)
         (write-object writer (name k) true)))}
 
+   Range
+   list-write-handler
+
+   List
+   list-write-handler
+
+   Cons
+   list-write-handler
+
+   EmptyList
+   list-write-handler
+
+   LazySeq
+   list-write-handler
+
+   RSeq
+   list-write-handler
+
+   IndexedSeq
+   list-write-handler
+
+   ChunkedCons
+   list-write-handler
+
+   ChunkedSeq
+   list-write-handler
+
+   PersistentQueueSeq
+   list-write-handler
+
+   PersistentQueue
+   list-write-handler
+
+   PersistentArrayMapSeq
+   list-write-handler
+
+   PersistentTreeMapSeq
+   list-write-handler
+
+   NodeSeq
+   list-write-handler
+
+   ArrayNodeSeq
+   list-write-handler
+
+   KeySeq
+   list-write-handler
+
+   ValSeq
+   list-write-handler
+
    PersistentHashMap
    {"map" map-write-handler}
 
    PersistentArrayMap
    {"map" map-write-handler}
 
+   PersistentTreeMap
+   {"map" map-write-handler}
+
    PersistentHashSet
-   {"set"
-    (fn [writer s]
-      (seq-write-handler writer "set" s))}
+   set-write-handler
+
+   PersistentTreeSet
+   set-write-handler
 
    PersistentVector
-   {"vector"
-    (fn [writer v]
-      (seq-write-handler writer "vector" v))}})
+   vector-write-handler
+
+   Subvec
+   vector-write-handler
+   })
 
 (defn create-writer [& {:keys [handlers]}]
   "Creates a fressian writer
@@ -163,6 +232,9 @@
    "set"
    (fn [reader tag component-count]
      (cljs.core/PersistentHashSet.fromArray (read-object reader)))
+   "list"
+   (fn [reader tag component-count]
+     (into '() (reverse (read-object reader))))
    "vector"
    (fn [reader tag component-count]
      (cljs.core/PersistentVector.fromArray (read-object reader)))})

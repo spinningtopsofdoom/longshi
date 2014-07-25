@@ -6,6 +6,10 @@
 
 (def js-int-type #js{}) ;;Internal marker for JavaScript numbers that are integers
 (def js-int-type-id (.getUid js/goog js-int-type)) ;;Marker code for js-int-type
+(def js-number-type-id (.getUid js/goog js/Number))
+(def js-string-type-id (.getUid js/goog js/String))
+(def js-boolean-type-id (.getUid js/goog js/Boolean))
+(def js-array-type-id (.getUid js/goog js/Array))
 
 (deftype
   ^{:doc
@@ -61,7 +65,9 @@
   (require-write-handler [wl tag o]
     (let [js-type-id (cond
                        (nil? o) nil
-                       (and (number? o) (zero? (js-mod o 1))) js-int-type-id
+                       (string? o) js-string-type-id
+                       (number? o) (if (zero? (js-mod o 1)) js-int-type-id js-number-type-id)
+                       (array? o) js-array-type-id
                        :else (.getUid js/goog (.-constructor o)))]
       (if-let [handler (-lookup wl js-type-id nil)]
         (if (or (nil? tag) (= tag (.-tag handler)) (= "any" (.-tag handler)))

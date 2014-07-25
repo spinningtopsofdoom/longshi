@@ -1,6 +1,18 @@
 # Longshi
 
 A ClojureScript implementation of [fressian](https://github.com/Datomic/fressian).
+## Release information
+
+Latest release: 0.1.3
+
+[Leiningen](https://github.com/technomancy/leiningen) dependency information:
+
+```clj
+[longshi "0.1.3"]
+```
+
+## Examples
+Currently the examples for the public api are [here](https://github.com/spinningtopsofdoom/longshi/blob/master/examples/core.cljs). More documentation will be forthcoming.
 
 ## Goals
 * Performance - Encoding and decoding should be as fast as possible.

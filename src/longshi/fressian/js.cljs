@@ -296,7 +296,7 @@
         bos))))
 
 (def string-reader (make-string-reader))
-
+(def ^:private string-buffer (StringBuffer.))
 (defn read-string-buffer!
   "Reads a string from a byte array
   bis (ByteInputStream) - Fressian input stream to get bytes from
@@ -431,18 +431,21 @@
             (Long. il32 ih32)
             (+ (* ih32 two-power-32) il32)))
         (== code (.-STRING c/codes))
-        (let [string-buffer (StringBuffer.)]
+        (let [string-buffer string-buffer]
           (do
+            (.set string-buffer "")
             (read-string-buffer! bis string-buffer (p/read-object! bis))
             (.toString string-buffer)))
         (<= 0xDA code 0xE1)
-        (let [string-buffer (StringBuffer.)]
+        (let [string-buffer string-buffer]
           (do
+            (.set string-buffer "")
             (read-string-buffer! bis string-buffer (- code (.-STRING_PACKED_LENGTH_START c/codes)))
             (.toString string-buffer)))
         (== code (.-STRING_CHUNK c/codes))
-        (let [string-buffer (StringBuffer.)]
+        (let [string-buffer string-buffer]
           (do
+            (.set string-buffer "")
             (read-string-buffer! bis string-buffer (p/read-object! bis))
             (loop []
               (let [next-code (bsp/read! bis)]

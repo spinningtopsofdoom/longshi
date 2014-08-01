@@ -198,7 +198,8 @@
 ;;UUID byte array for transformations from string to byte array
 (def ^:private uuid-ba (make-byte-array 16))
 (def ^:private uuid-dv (make-data-view uuid-ba))
-
+;;Regex Alias since Google Closure can't optimize using js/RegExp
+(def ^:private regex-alias (.-constructor #""))
 (def
   ^{:doc
     "Extended freesian write handlers
@@ -221,7 +222,7 @@
              (dotimes [i (alength uuid-chunks)]
                (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) little-endian))
              (p/write-bytes! fw uuid-ba)))))]
-     [js/RegExp "regex"
+     [regex-alias "regex"
      (fn [fw re]
        (do
          (p/write-tag! fw "regex" 1)

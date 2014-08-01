@@ -152,7 +152,12 @@
               (bsp/write-bytes! bos b offset length)))))
       bos))
   (write-int! [bos i]
-    (p/write-long! bos (Long.fromNumber i)))
+    (p/write-long!
+     bos
+     (let [high (bit-or (/ i (.-TWO_PWR_32_DBL_ Long)) 0)
+        high (if (neg? i) (dec high) high)
+        low (bit-or (js-mod i (.-TWO_PWR_32_DBL_ Long)) 0)]
+      (Long. low high))))
   (write-long! [bos l]
     (do
       (let [lb (.getLowBits l)

@@ -190,7 +190,7 @@
 
      If no handler is found a tagged object is returned"
     (let [rh (or (get handlers tag) (get standard-handlers tag))]
-      (if rh
+      (if-not (nil? rh)
         (rh bis tag fields)
         (let [values (make-array fields)]
           (do

@@ -105,16 +105,16 @@
     (fn [writer k]
       (do
         (write-tag writer "key" 2)
-        (write-object writer (namespace k) true)
-        (write-object writer (name k) true)))}
+        (write-object writer (.-ns k) true)
+        (write-object writer (.-name k) true)))}
 
    Symbol
    {"sym"
     (fn [writer k]
       (do
         (write-tag writer "sym" 2)
-        (write-object writer (namespace k) true)
-        (write-object writer (name k) true)))}
+        (write-object writer (.-ns k) true)
+        (write-object writer (.-name k) true)))}
 
    Range
    list-write-handler

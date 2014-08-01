@@ -7,10 +7,13 @@
   :jvm-opts ["-Xmx1g" "-XX:+UseConcMarkSweepGC"]
   :source-paths ["src"]
   :cljsbuild {
-              :builds [{:id "longshi"
+              :builds [{:id "benchmark"
+                        :source-paths ["src" "benchmark"]
+                        :compiler {:output-to "target/bench/longshi_bench.js"
+                                   :optimizations :advanced}}
+                       {:id "longshi"
                         :source-paths ["src"]
-                        :compiler {
-                                   :output-to "longshi.js"
+                        :compiler {:output-to "longshi.js"
                                    :output-dir "out"
                                    :optimizations :none
                                    :source-map true}}

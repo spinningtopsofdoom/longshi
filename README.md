@@ -21,7 +21,10 @@ Currently the examples for the public api are [here](https://github.com/spinning
 * Minimal Size - For the browser implementation, the file size should be as small as possible.
 
 ## Status
-Alpha release - All fressian features have been ported over.  Encoding and decoding are currently significantly (two to three times) faster then the same operations on edn data.  The API closely mirrors [data.fressian](https://github.com/clojure/data.fressian).
+Alpha release - All fressian features have been ported over.  The API closely mirrors [data.fressian](https://github.com/clojure/data.fressian).
+
+## Speed
+Encoding and decoding are currently two to three times faster then EDN and five to ten times slower then [Transit](https://github.com/cognitect/transit-cljs).
 
 ## Differnces from the canonical (java) implementation
 * Numbers - Due to JavaScript numbers being doubles, the maximum integer returned on the decoding side is -2^52 to (2^52 - 1) and anything over that is a Google Closure [long](http://docs.closure-library.googlecode.com/git/class_goog_math_Long.html) object.

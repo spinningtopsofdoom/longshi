@@ -9,9 +9,17 @@
   :source-paths ["src"]
   :cljsbuild {
               :builds [{:id "benchmark"
-                        :source-paths ["src" "benchmark"]
+                        :source-paths ["src" "sample" "benchmark"]
                         :compiler {:output-to "target/bench/longshi_bench.js"
                                    :optimizations :advanced}}
+                       {:id "perfomance"
+                        :source-paths ["src" "sample" "perf"]
+                        :compiler {:output-to "target/perf/longshi_perf.js"
+                                   :optimizations :whitespace
+                                   :source-map "target/perf/longshi_perf.js.map"
+                                   :output-dir "target/perf"
+                                   :static-fns true
+                                   }}
                        {:id "longshi"
                         :source-paths ["src"]
                         :compiler {:output-to "longshi.js"

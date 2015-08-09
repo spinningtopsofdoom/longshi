@@ -22,8 +22,10 @@
                                    }}
                        {:id "longshi"
                         :source-paths ["src"]
-                        :compiler {:output-to "longshi.js"
-                                   :output-dir "out"
+                        :compiler {:output-to "target/dev/longshi.js"
+                                   :output-dir "target/dev"
+                                   :asset-path "target/dev"
+                                   :main "longshi.core"
                                    :optimizations :none
                                    :source-map true}}
                       {:id "tests"

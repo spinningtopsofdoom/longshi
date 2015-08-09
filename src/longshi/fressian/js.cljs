@@ -253,33 +253,32 @@
           (do
             (bsp/write! bos (.-STRUCT c/codes))
             (p/write-int! bos index))))))
-  (write-object! [bos o]
-    (p/write-object! bos o false))
-  (write-object! [bos o cache]
-    (p/write-as! bos nil o cache))
-  (write-as! [bos tag o]
-    (p/write-as! bos tag o false))
-  (write-as! [bos tag o cache]
-    (let [co (if (instance? CachedObject o) (p/cached-value o) o)
-          is-cache (or cache (instance? CachedObject o))]
-      (do
-        (if is-cache
-          (if (should-skip-cache co)
-            (p/write-as! bos tag co false)
-            (let [index (.old-index! (.-priority-cache bos) co)]
-              (cond
-                (== -1 index)
-                (do
-                  (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
-                  (p/write-as! bos tag co false))
-                (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
-                (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
-                :else
-                (do
-                  (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
-                  (p/write-int! bos index)))))
-          ((.require-write-handler (.-handlers bos) tag co) bos co))
-        bos)))
+  (write-object!
+    ([bos o] (p/write-object! bos o false))
+    ([bos o cache] (p/write-as! bos nil o cache)))
+  (write-as!
+    ([bos tag o] (p/write-as! bos tag o false))
+    ([bos tag o cache]
+     (let [co (if (instance? CachedObject o) (p/cached-value o) o)
+           is-cache (or cache (instance? CachedObject o))]
+       (do
+         (if is-cache
+           (if (should-skip-cache co)
+             (p/write-as! bos tag co false)
+             (let [index (.old-index! (.-priority-cache bos) co)]
+               (cond
+                 (== -1 index)
+                 (do
+                   (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
+                   (p/write-as! bos tag co false))
+                 (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
+                 (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
+                 :else
+                 (do
+                   (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
+                   (p/write-int! bos index)))))
+           ((.require-write-handler (.-handlers bos) tag co) bos co))
+         bos))))
   (reset-caches! [bos]
     (do
       (.clear-caches! bos)

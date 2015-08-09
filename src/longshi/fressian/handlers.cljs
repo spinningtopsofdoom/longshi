@@ -302,7 +302,7 @@
              (do
                (dotimes [i 8]
                  (aset uuid-chunks  i (.toString (.getUint16 uuid-dv (* i 2) false) 16)))
-               (UUID. (.replace (.join uuid-chunks "") #"(.{8})(.{4})(.{4})(.{4})(.{8})" "$1-$2-$3-$4-$5")))))
+               (UUID. (.replace (.join uuid-chunks "") #"(.{8})(.{4})(.{4})(.{4})(.{8})" "$1-$2-$3-$4-$5") nil))))
          "regex"
          (fn [fr tag component-count]
            (let [pattern (p/read-object! fr)]

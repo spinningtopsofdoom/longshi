@@ -35,16 +35,14 @@
     (let [old-hop-idx hop-idx
           old-hop-idx-len (.-length old-hop-idx)
           old-keys ks]
-      (do
-        (set! hop-idx (js/Uint32Array. (* 2 (.-length hop-idx))))
-        (set! ks (.concat ks (js/Array. cap)))
-        (set! cap (bit-shift-left cap 1))
-        (loop [slot 0]
-          (when (< slot old-hop-idx-len)
-            (let [new-slot (.find-slot this (aget old-hop-idx slot))]
-              (do
-                (.set hop-idx (.subarray old-hop-idx slot (+ 2 slot)) new-slot)
-                (recur (+ 2 slot)))))))))
+      (set! hop-idx (js/Uint32Array. (* 2 (.-length hop-idx))))
+      (set! ks (.concat ks (js/Array. cap)))
+      (set! cap (bit-shift-left cap 1))
+      (loop [slot 0]
+        (when (< slot old-hop-idx-len)
+          (let [new-slot (.find-slot this (aget old-hop-idx slot))]
+            (.set hop-idx (.subarray old-hop-idx slot (+ 2 slot)) new-slot)
+            (recur (+ 2 slot)))))))
   (intern! [this k]
     "Associates the key with a positive integer
 
@@ -59,13 +57,12 @@
       (if (== 0 bhash)
         (let [slot (bit-shift-left bkt 2)
               i cnt]
-            (do
-              (.set hop-idx (array h i) slot)
-              (aset ks i k)
-              (set! cnt (inc cnt))
-              (when (== cnt cap)
-                (.resize this))
-              i))
+          (.set hop-idx (array h i) slot)
+          (aset ks i k)
+          (set! cnt (inc cnt))
+          (when (== cnt cap)
+            (.resize this))
+          i)
         (if (== h bhash)
           (let [i (aget hop-idx (inc (bit-shift-left bkt 2)))
                 bkey (aget ks i)]
@@ -83,13 +80,12 @@
                   (recur (bit-and (inc bkt) mask)))
                 (let [slot (+ 2 (bit-shift-left bkt 2))
                       i cnt]
-                    (do
-                      (.set hop-idx (array h i) slot)
-                      (aset ks i k)
-                      (set! cnt (inc cnt))
-                      (when (== cnt cap)
-                        (.resize this))
-                      i)))))))))
+                  (.set hop-idx (array h i) slot)
+                  (aset ks i k)
+                  (set! cnt (inc cnt))
+                  (when (== cnt cap)
+                    (.resize this))
+                  i))))))))
   (old-index! [this k]
     "Associates the key with a positive integer
 
@@ -105,18 +101,15 @@
   (clear! [_]
     "Removes all associations from the map and sets cnt to zero"
     (let [cap2 (bit-shift-left cap 2)]
-     (do
       (set! cnt 0)
       (loop [n 0]
         (when (< n cap)
-          (do
-            (aset ks n nil)
-            (recur (inc n))))))
+          (aset ks n nil)
+          (recur (inc n))))
       (loop [n 0]
         (when (< n cap2)
-          (do
-            (aset hop-idx n 0)
-            (recur (inc n)))))))
+          (aset hop-idx n 0)
+          (recur (inc n))))))
   (get [this k]
     "Get the value of key or -1 if it isn't in the map"
     (let [h (.hash this k)
@@ -159,4 +152,4 @@
                cap))
           hop-idx (js/Uint32Array. (bit-shift-left cap 2))
           ks (js/Array. cap)]
-      (->InterleavedIndexHopMap cap 0 hop-idx ks))))
+      (InterleavedIndexHopMap. cap 0 hop-idx ks))))

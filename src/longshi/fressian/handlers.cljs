@@ -132,11 +132,10 @@
   ia (typed array) - Integer typed array to write to the fressian stream"
   [fw ia]
   (let [cnt (alength ia)]
-    (do
-      (p/write-tag! fw "int[]" 2)
-      (p/write-int! fw cnt)
-      (dotimes [i cnt]
-        (p/write-int! fw (aget ia i))))))
+    (p/write-tag! fw "int[]" 2)
+    (p/write-int! fw cnt)
+    (dotimes [i cnt]
+      (p/write-int! fw (aget ia i)))))
 (def
   ^{:doc
     "Write handlers for primitive types, arrays of primitive types, and TaggedObject"}
@@ -157,44 +156,39 @@
      [js/Float32Array "float[]"
       (fn [fw fa]
         (let [cnt (alength fa)]
-          (do
-            (p/write-tag! fw "float[]" 2)
-            (p/write-int! fw cnt)
-            (dotimes [i cnt]
-              (p/write-float! fw (aget fa i))))))]
+          (p/write-tag! fw "float[]" 2)
+          (p/write-int! fw cnt)
+          (dotimes [i cnt]
+            (p/write-float! fw (aget fa i)))))]
      [js/Float64Array "double[]"
       (fn [fw da]
         (let [cnt (alength da)]
-          (do
-            (p/write-tag! fw "double[]" 2)
-            (p/write-int! fw cnt)
-            (dotimes [i cnt]
-              (p/write-double! fw (aget da i))))))]
+          (p/write-tag! fw "double[]" 2)
+          (p/write-int! fw cnt)
+          (dotimes [i cnt]
+            (p/write-double! fw (aget da i)))))]
 
      [js/Array "Object[]"
       (fn [fw oa]
         (let [cnt (alength oa)]
-          (do
-            (p/write-tag! fw "Object[]" cnt)
-            (p/write-int! fw cnt)
-            (dotimes [i cnt]
-              (p/write-object! fw (aget oa i))))))]
+          (p/write-tag! fw "Object[]" cnt)
+          (p/write-int! fw cnt)
+          (dotimes [i cnt]
+            (p/write-object! fw (aget oa i)))))]
      [TaggedObject "any"
       (fn [fw to]
         (let [cnt (alength (.-value to))]
-          (do
-            (p/write-tag! fw (.-tag to) cnt)
-            (dotimes [i cnt]
-              (p/write-object! fw (aget (.-value to) i))))))]
+          (p/write-tag! fw (.-tag to) cnt)
+          (dotimes [i cnt]
+            (p/write-object! fw (aget (.-value to) i)))))]
 
      [TaggedArray "any"
       (fn [fw ta]
         (let [cnt (alength (.-value ta))]
-          (do
-            (p/write-tag! fw (.-tag ta) 2)
-            (p/write-int! fw cnt)
-            (dotimes [i cnt]
-              (p/write-object! fw (aget (.-value ta) i))))))]]))
+          (p/write-tag! fw (.-tag ta) 2)
+          (p/write-int! fw cnt)
+          (dotimes [i cnt]
+            (p/write-object! fw (aget (.-value ta) i)))))]]))
 ;;UUID byte array for transformations from string to byte array
 (def ^:private uuid-ba (make-byte-array 16))
 (def ^:private uuid-dv (make-data-view uuid-ba))
@@ -209,34 +203,29 @@
   (create-handler
     [[js/Date "inst"
      (fn [fw d]
-       (do
-         (p/write-tag! fw "inst" 1)
-         (p/write-int! fw (.getUTCMilliseconds d))))]
+       (p/write-tag! fw "inst" 1)
+       (p/write-int! fw (.getUTCMilliseconds d)))]
      [UUID "uuid"
      (fn [fw uuid]
-       (do
-         (p/write-tag! fw "uuid" 1)
-         (let [uuid-str (.-uuid uuid)
-               uuid-chunks (.match uuid-str (js/RegExp. "[0-9a-fA-F]{1,4}" "g"))]
-           (do
-             (dotimes [i (alength uuid-chunks)]
-               (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) little-endian))
-             (p/write-bytes! fw uuid-ba)))))]
+       (p/write-tag! fw "uuid" 1)
+       (let [uuid-str (.-uuid uuid)
+             uuid-chunks (.match uuid-str (js/RegExp. "[0-9a-fA-F]{1,4}" "g"))]
+         (dotimes [i (alength uuid-chunks)]
+           (.setUint16 uuid-dv (* i 2) (js/parseInt (aget uuid-chunks i) 16) little-endian))
+         (p/write-bytes! fw uuid-ba)))]
      [regex-alias "regex"
      (fn [fw re]
-       (do
-         (p/write-tag! fw "regex" 1)
-         (p/write-string! fw (.-source re))))]]))
+       (p/write-tag! fw "regex" 1)
+       (p/write-string! fw (.-source re)))]]))
 
 (defn- int-check
   "Check if number is within int range (-2 ^ 32 to (2 ^ 32) - 1)
 
   i (number) - JavaScript number to check"
   [i]
-  (do
-    (when-not (and (number? i) (== i (bit-or i 0)))
-      (throw (js/Error. (str "Value out of range for int: (" i ")"))))
-      i))
+  (when-not (and (number? i) (== i (bit-or i 0)))
+    (throw (js/Error. (str "Value out of range for int: (" i ")"))))
+  i)
 (def
   ^{:doc
     "Read handlers for arrays of primitive types and extended types"}
@@ -247,50 +236,44 @@
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  ba (make-array size)]
-             (do
-               (dotimes [i size]
-                 (aset ba i (p/read-boolean! fr)))
-               ba)))
+             (dotimes [i size]
+               (aset ba i (p/read-boolean! fr)))
+             ba))
          "int[]"
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  ia (js/Int32Array. size)]
-             (do
-               (dotimes [i size]
-                 (aset ia i (int-check (p/read-int! fr))))
-               ia)))
+             (dotimes [i size]
+               (aset ia i (int-check (p/read-int! fr))))
+             ia))
          "float[]"
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  fa (js/Float32Array. size)]
-             (do
-               (dotimes [i size]
-                 (aset fa i (p/read-float! fr)))
-               fa)))
+             (dotimes [i size]
+               (aset fa i (p/read-float! fr)))
+             fa))
          "double[]"
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  da (js/Float64Array. size)]
-             (do
-               (dotimes [i size]
-                 (aset da i (p/read-double! fr)))
-               da)))
+             (dotimes [i size]
+               (aset da i (p/read-double! fr)))
+             da))
          "long[]"
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  la (make-array size)]
-             (do
-               (dotimes [i size]
-                 (aset la i (p/read-int! fr)))
-               la)))
+             (dotimes [i size]
+               (aset la i (p/read-int! fr)))
+             la))
          "Object[]"
          (fn [fr tag component-count]
            (let [size (int-check (p/read-int! fr))
                  oa (make-array size)]
-             (do
-               (dotimes [i size]
-                 (aset oa i (p/read-object! fr)))
-               oa)))
+             (dotimes [i size]
+               (aset oa i (p/read-object! fr)))
+             oa))
          "inst"
          (fn [fr tag component-count]
            (let [utc-millis (p/read-int! fr)]
@@ -299,12 +282,11 @@
          (fn [fr tag component-count]
            (let [uuid-bytes (p/read-object! fr)
                  uuid-chunks #js []]
-             (do
-               (dotimes [i 8]
-                 (aset uuid-chunks  i (.toString (.getUint16 uuid-dv (* i 2) false) 16)))
-               (UUID. (.replace (.join uuid-chunks "") #"(.{8})(.{4})(.{4})(.{4})(.{8})" "$1-$2-$3-$4-$5") nil))))
+             (dotimes [i 8]
+               (aset uuid-chunks i (.toString (.getUint16 uuid-dv (* i 2) false) 16)))
+             (UUID. (.replace (.join uuid-chunks "") #"(.{8})(.{4})(.{4})(.{4})(.{8})" "$1-$2-$3-$4-$5") nil)))
          "regex"
          (fn [fr tag component-count]
            (let [pattern (p/read-object! fr)]
              (js/RegExp. pattern)))
-       }))
+         }))

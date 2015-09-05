@@ -90,67 +90,61 @@
         bos)))
   (write-footer-for! [bos byte-buffer]
     (let [source (bsp/duplicate-bytes byte-buffer)]
-      (if-not (zero? (bsp/bytes-written bos))
-        (throw (js/Error. "writeFooterFor can only be called at a footer boundary."))
-        (do
-          (bsp/write-bytes! bos source 0 (alength source))
-          (let [length (bsp/bytes-written bos)]
-            (do
-              (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
-              (bsp/write-int32! bos length)
-              (bsp/write-int32! bos (bsp/get-checksum bos))
-              (bsp/reset! bos)
-              (.clear-caches! bos)))
-          bos))))
+      (when-not (zero? (bsp/bytes-written bos))
+        (throw (js/Error. "writeFooterFor can only be called at a footer boundary.")))
+      (bsp/write-bytes! bos source 0 (alength source))
+      (let [length (bsp/bytes-written bos)]
+        (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
+        (bsp/write-int32! bos length)
+        (bsp/write-int32! bos (bsp/get-checksum bos))
+        (bsp/reset! bos)
+        (.clear-caches! bos))
+      bos))
   p/FressianWriter
   (write-null! [bos]
-    (do
-      (bsp/write! bos (.-NULL c/codes))
-      bos))
+    (bsp/write! bos (.-NULL c/codes))
+    bos)
   (write-boolean! [bos b]
-    (do
-      (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes)))
-      bos))
+    (bsp/write! bos (if b (.-TRUE c/codes) (.-FALSE c/codes)))
+    bos)
   (write-string! [bos s]
     (let [str-length (alength s)
           sba (.get-buffer string-writer)]
-      (do
-        (loop [str-pos 0]
-          (let [sa (.string-chunk-utf8 string-writer s str-pos str-length)
-                new-str-pos (+ str-pos (aget sa 0))
-                buf-pos (aget sa 1)]
-            (cond
-              (< buf-pos (.-STRING_PACKED_LENGTH_END c/ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START c/codes) buf-pos))
-              (== new-str-pos str-length)
-                (do
-                  (bsp/write! bos (.-STRING c/codes))
-                  (p/write-int! bos buf-pos))
-              :else
-                (do
-                  (bsp/write! bos (.-STRING_CHUNK c/codes))
-                  (p/write-int! bos buf-pos)))
-            (bsp/write-bytes! bos sba 0 buf-pos)
-            (if (< new-str-pos str-length)
-              (recur new-str-pos))))
-        bos)))
-  (write-bytes! [bos b]
-    (do
-      (if (< (alength b) (.-BYTES_PACKED_LENGTH_END c/ranges))
-        (do
-          (bsp/write! bos (+ (alength b) (.-BYTES_PACKED_LENGTH_START c/codes)))
-          (bsp/write-bytes! bos b 0 (alength b)))
-        (loop [offset 0 length (alength b)]
-          (if (> length (.-BYTE_CHUNK_SIZE c/ranges))
+      (loop [str-pos 0]
+        (let [sa (.string-chunk-utf8 string-writer s str-pos str-length)
+              new-str-pos (+ str-pos (aget sa 0))
+              buf-pos (aget sa 1)]
+          (cond
+            (< buf-pos (.-STRING_PACKED_LENGTH_END c/ranges)) (bsp/write! bos (+ (.-STRING_PACKED_LENGTH_START c/codes) buf-pos))
+            (== new-str-pos str-length)
             (do
-              (bsp/write! bos (.-BYTES_CHUNK c/codes))
-              (p/write-int! bos (.-BYTE_CHUNK_SIZE c/ranges))
-              (bsp/write-bytes! bos b offset (.-BYTE_CHUNK_SIZE c/ranges))
-              (recur (+ offset (.-BYTE_CHUNK_SIZE c/ranges)) (- length (.-BYTE_CHUNK_SIZE c/ranges))))
+              (bsp/write! bos (.-STRING c/codes))
+              (p/write-int! bos buf-pos))
+            :else
             (do
-              (bsp/write! bos (.-BYTES c/codes))
-              (p/write-int! bos length)
-              (bsp/write-bytes! bos b offset length)))))
+              (bsp/write! bos (.-STRING_CHUNK c/codes))
+              (p/write-int! bos buf-pos)))
+          (bsp/write-bytes! bos sba 0 buf-pos)
+          (when (< new-str-pos str-length)
+            (recur new-str-pos))))
       bos))
+  (write-bytes! [bos b]
+    (if (< (alength b) (.-BYTES_PACKED_LENGTH_END c/ranges))
+      (do
+        (bsp/write! bos (+ (alength b) (.-BYTES_PACKED_LENGTH_START c/codes)))
+        (bsp/write-bytes! bos b 0 (alength b)))
+      (loop [offset 0 length (alength b)]
+        (if (> length (.-BYTE_CHUNK_SIZE c/ranges))
+          (do
+            (bsp/write! bos (.-BYTES_CHUNK c/codes))
+            (p/write-int! bos (.-BYTE_CHUNK_SIZE c/ranges))
+            (bsp/write-bytes! bos b offset (.-BYTE_CHUNK_SIZE c/ranges))
+            (recur (+ offset (.-BYTE_CHUNK_SIZE c/ranges)) (- length (.-BYTE_CHUNK_SIZE c/ranges))))
+          (do
+            (bsp/write! bos (.-BYTES c/codes))
+            (p/write-int! bos length)
+            (bsp/write-bytes! bos b offset length)))))
+    bos)
   (write-int! [bos i]
     (p/write-long!
      bos
@@ -159,84 +153,77 @@
         low (bit-or (js-mod i (.-TWO_PWR_32_DBL_ Long)) 0)]
       (Long. low high))))
   (write-long! [bos l]
-    (do
-      (let [lb (.getLowBits l)
-            hb (.getHighBits l)
-            bits (bit-switch l)]
-        (cond
-          (<= 1 bits 14)
-          (do
-            (bsp/write! bos (.-INT c/codes))
-            (bsp/write-int32! bos hb)
-            (bsp/write-int32! bos lb))
-          (<= 15 bits 22)
-          (let [ic (bit-shift-right hb 16)]
-            (do
-              (bsp/write! bos (+ (.-INT_PACKED_7_ZERO c/codes) ic))
-              (bsp/write-int16! bos hb)
-              (bsp/write-int32! bos lb)))
-          (<= 23 bits 30)
-          (let [ic (bit-shift-right hb 8)]
-            (do
-              (bsp/write! bos (+ (.-INT_PACKED_6_ZERO c/codes) ic))
-              (bsp/write! bos hb)
-              (bsp/write-int32! bos lb)))
-          (<= 31 bits 38)
-          (do
-            (bsp/write! bos (+ (.-INT_PACKED_5_ZERO c/codes) hb))
-            (bsp/write-int32! bos lb))
-          (<= 39 bits 44)
-          (do
-            (bsp/write! bos (+ (.-INT_PACKED_4_ZERO c/codes) (bit-shift-right lb 24)))
-            (bsp/write-int24! bos lb))
-          (<= 45 bits 51)
-          (do
-            (bsp/write! bos (+ (.-INT_PACKED_3_ZERO c/codes) (bit-shift-right lb 16)))
-            (bsp/write-int16! bos lb))
-          (<= 52 bits 57)
-          (do
-            (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8)))
-            (bsp/write! bos lb))
-          (<= 58 bits 64)
-          (do
-            (when (< lb -1)
-              (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8))))
-            (bsp/write! bos lb))
-          :else
-          (throw (js/Error. (str "Long (" l ") can not be converted")))))
-      bos))
-  (write-float! [bos f]
-    (do
-      (bsp/write! bos (.-FLOAT c/codes))
-      (bsp/write-float! bos f)
-      bos))
-  (write-double! [bos d]
-    (do
+    (let [lb (.getLowBits l)
+          hb (.getHighBits l)
+          bits (bit-switch l)]
       (cond
-        (== d 0.0) (bsp/write! bos (.-DOUBLE_0 c/codes))
-        (== d 1.0) (bsp/write! bos (.-DOUBLE_1 c/codes))
+        (<= 1 bits 14)
+        (do
+          (bsp/write! bos (.-INT c/codes))
+          (bsp/write-int32! bos hb)
+          (bsp/write-int32! bos lb))
+        (<= 15 bits 22)
+        (let [ic (bit-shift-right hb 16)]
+          (bsp/write! bos (+ (.-INT_PACKED_7_ZERO c/codes) ic))
+          (bsp/write-int16! bos hb)
+          (bsp/write-int32! bos lb))
+        (<= 23 bits 30)
+        (let [ic (bit-shift-right hb 8)]
+          (bsp/write! bos (+ (.-INT_PACKED_6_ZERO c/codes) ic))
+          (bsp/write! bos hb)
+          (bsp/write-int32! bos lb))
+        (<= 31 bits 38)
+        (do
+          (bsp/write! bos (+ (.-INT_PACKED_5_ZERO c/codes) hb))
+          (bsp/write-int32! bos lb))
+        (<= 39 bits 44)
+        (do
+          (bsp/write! bos (+ (.-INT_PACKED_4_ZERO c/codes) (bit-shift-right lb 24)))
+          (bsp/write-int24! bos lb))
+        (<= 45 bits 51)
+        (do
+          (bsp/write! bos (+ (.-INT_PACKED_3_ZERO c/codes) (bit-shift-right lb 16)))
+          (bsp/write-int16! bos lb))
+        (<= 52 bits 57)
+        (do
+          (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8)))
+          (bsp/write! bos lb))
+        (<= 58 bits 64)
+        (do
+          (when (< lb -1)
+            (bsp/write! bos (+ (.-INT_PACKED_2_ZERO c/codes) (bit-shift-right lb 8))))
+          (bsp/write! bos lb))
         :else
-        (do
-          (bsp/write! bos (.-DOUBLE c/codes))
-          (bsp/write-double! bos d)))
-      bos))
+        (throw (js/Error. (str "Long (" l ") can not be converted")))))
+    bos)
+  (write-float! [bos f]
+    (bsp/write! bos (.-FLOAT c/codes))
+    (bsp/write-float! bos f)
+    bos)
+  (write-double! [bos d]
+    (cond
+      (== d 0.0) (bsp/write! bos (.-DOUBLE_0 c/codes))
+      (== d 1.0) (bsp/write! bos (.-DOUBLE_1 c/codes))
+      :else
+      (do
+        (bsp/write! bos (.-DOUBLE c/codes))
+        (bsp/write-double! bos d)))
+    bos)
   (write-list! [bos l]
-    (do
-      (let [list-seq
-            (cond
-              (array? l) (prim-seq l)
-              (seq? l) l
-              (seqable? l) (seq l))
-            length (count l)]
+    (let [list-seq
+          (cond
+            (array? l) (prim-seq l)
+            (seq? l) l
+            (seqable? l) (seq l))
+          length (count l)]
+      (if (< length (.-LIST_PACKED_LENGTH_END c/ranges))
+        (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
         (do
-          (if (< length (.-LIST_PACKED_LENGTH_END c/ranges))
-            (bsp/write! bos (+ length (.-LIST_PACKED_LENGTH_START c/codes)))
-            (do
-              (bsp/write! bos (.-LIST c/codes))
-              (p/write-int! bos length)))
-          (doseq [li l]
-            (p/write-object! bos li))))
-      bos))
+          (bsp/write! bos (.-LIST c/codes))
+          (p/write-int! bos length)))
+      (doseq [li l]
+        (p/write-object! bos li)))
+    bos)
   (write-tag! [bos tag component-count]
     (if-let [shortcut-code (aget c/tag-to-code tag)]
       (bsp/write! bos shortcut-code)
@@ -261,38 +248,35 @@
     ([bos tag o cache]
      (let [co (if (instance? CachedObject o) (p/cached-value o) o)
            is-cache (or cache (instance? CachedObject o))]
-       (do
-         (if is-cache
-           (if (should-skip-cache co)
-             (p/write-as! bos tag co false)
-             (let [index (.old-index! (.-priority-cache bos) co)]
-               (cond
-                 (== -1 index)
-                 (do
-                   (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
-                   (p/write-as! bos tag co false))
-                 (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
-                 (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
-                 :else
-                 (do
-                   (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
-                   (p/write-int! bos index)))))
-           ((.require-write-handler (.-handlers bos) tag co) bos co))
-         bos))))
+       (if is-cache
+         (if (should-skip-cache co)
+           (p/write-as! bos tag co false)
+           (let [index (.old-index! (.-priority-cache bos) co)]
+             (cond
+               (== -1 index)
+               (do
+                 (bsp/write! bos (.-PUT_PRIORITY_CACHE c/codes))
+                 (p/write-as! bos tag co false))
+               (< index (.-PRIORITY_CACHE_PACKED_END c/ranges))
+               (bsp/write! bos (+ (.-PRIORITY_CACHE_PACKED_START c/codes) index))
+               :else
+               (do
+                 (bsp/write! bos (.-GET_PRIORITY_CACHE c/codes))
+                 (p/write-int! bos index)))))
+         ((.require-write-handler (.-handlers bos) tag co) bos co))
+       bos)))
   (reset-caches! [bos]
-    (do
-      (.clear-caches! bos)
-      (bsp/write! bos (.-RESET-CACHES c/codes))
-      bos))
+    (.clear-caches! bos)
+    (bsp/write! bos (.-RESET-CACHES c/codes))
+    bos)
   (write-footer! [bos]
     (let [length (bsp/bytes-written bos)]
-      (do
-        (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
-        (bsp/write-int32! bos length)
-        (bsp/write-int32! bos (bsp/get-checksum bos))
-        (bsp/reset! bos)
-        (.clear-caches! bos)
-        bos))))
+      (bsp/write-int32! bos (.-FOOTER_MAGIC c/codes))
+      (bsp/write-int32! bos length)
+      (bsp/write-int32! bos (bsp/get-checksum bos))
+      (bsp/reset! bos)
+      (.clear-caches! bos)
+      bos)))
 
 (def string-reader (make-string-reader))
 (def ^:private string-buffer (StringBuffer.))
@@ -302,9 +286,8 @@
   string-buffer (StringBuffer) - Buffer to append string to
   byte-len (int) - The number of bytes to read from the bytestream"
   [bis string-buffer byte-len]
-    (do
-      (bsp/read-bytes! bis (.get-buffer string-reader) 0 byte-len)
-      (.read-utf8-chars string-reader string-buffer 0 byte-len)))
+  (bsp/read-bytes! bis (.get-buffer string-reader) 0 byte-len)
+  (.read-utf8-chars string-reader string-buffer 0 byte-len))
 
 (extend-type bs/ByteInputStream
   p/FressianReader
@@ -317,9 +300,9 @@
       (throw (js/Error. (str "Expected boolean got (" code ")"))))))
   (read-float! [bis]
     (let [code (bsp/read! bis)]
-      (if (== code (.-FLOAT c/codes))
-        (bsp/read-float! bis)
-        (throw (js/Error. (str "Expected float got (" code ")"))))))
+      (when-not (== code (.-FLOAT c/codes))
+        (throw (js/Error. (str "Expected float got (" code ")"))))
+      (bsp/read-float! bis)))
   (read-double! [bis]
     (let [code (bsp/read! bis)]
       (cond
@@ -437,69 +420,61 @@
             (.toString string-buffer)))
         (<= 0xDA code 0xE1)
         (let [string-buffer string-buffer]
-          (do
-            (.set string-buffer "")
-            (read-string-buffer! bis string-buffer (- code (.-STRING_PACKED_LENGTH_START c/codes)))
-            (.toString string-buffer)))
+          (.set string-buffer "")
+          (read-string-buffer! bis string-buffer (- code (.-STRING_PACKED_LENGTH_START c/codes)))
+          (.toString string-buffer))
         (== code (.-STRING_CHUNK c/codes))
         (let [string-buffer string-buffer]
-          (do
-            (.set string-buffer "")
-            (read-string-buffer! bis string-buffer (p/read-object! bis))
-            (loop []
-              (let [next-code (bsp/read! bis)]
-                (cond
-                  (== next-code (.-STRING c/codes))
+          (.set string-buffer "")
+          (read-string-buffer! bis string-buffer (p/read-object! bis))
+          (loop []
+            (let [next-code (bsp/read! bis)]
+              (cond
+                (== next-code (.-STRING c/codes))
+                (read-string-buffer! bis string-buffer (p/read-object! bis))
+                (<= 0xDA next-code 0xE1)
+                (read-string-buffer! bis string-buffer (- next-code (.-STRING_PACKED_LENGTH_START c/codes)))
+                (== next-code (.-STRING_CHUNK c/codes))
+                (do
                   (read-string-buffer! bis string-buffer (p/read-object! bis))
-                  (<= 0xDA next-code 0xE1)
-                  (read-string-buffer! bis string-buffer (- next-code (.-STRING_PACKED_LENGTH_START c/codes)))
-                  (== next-code (.-STRING_CHUNK c/codes))
-                    (do
-                      (read-string-buffer! bis string-buffer (p/read-object! bis))
-                      (recur))
-                  :else
-                  (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
-            (.toString string-buffer)))
+                  (recur))
+                :else
+                (throw (js/Error. (str "Expected chunked string (" next-code ")"))))))
+          (.toString string-buffer))
         (== code (.-BYTES c/codes))
         (let [length (p/read-object! bis)
               ba (make-byte-array length)]
-          (do
-            (bsp/read-bytes! bis ba 0 length)
-            ba))
+          (bsp/read-bytes! bis ba 0 length)
+          ba)
         (<= 0xD0 code 0xD7)
         (let [length (- code (.-BYTES_PACKED_LENGTH_START c/codes))
               ba (make-byte-array length)]
-          (do
-            (bsp/read-bytes! bis ba 0 length)
-            ba))
+          (bsp/read-bytes! bis ba 0 length)
+          ba)
         (== code (.-BYTES_CHUNK c/codes))
         (let [chunks (array)]
-          (do
-            (loop [code code]
-              (cond
-                (== code (.-BYTES_CHUNK c/codes))
-                (let [length (p/read-object! bis)
-                      ba (make-byte-array length)]
-                  (do
-                    (bsp/read-bytes! bis ba 0 length)
-                    (.push chunks ba)
-                    (recur (bsp/read! bis))))
-                (== code (.-BYTES c/codes))
-                (let [length (p/read-object! bis)
-                      ba (make-byte-array length)]
-                  (do
-                    (bsp/read-bytes! bis ba 0 length)
-                    (.push chunks ba)))
-                :else
-                (throw (js/Error. (str "conclusion of chunked bytes (" code ")")))))
-            (let [length (reduce #(+ %1 (alength %2)) 0 (seq chunks))
-                  ba (make-byte-array length)]
-               (do
-                 (loop [pos 0 chunk 0]
-                   (when (< chunk (alength chunks))
-                     (.set ba (aget chunks chunk) pos)
-                     (recur (+ pos (alength (aget chunks chunk))) (inc chunk))))
-                 ba))))
+          (loop [code code]
+            (cond
+              (== code (.-BYTES_CHUNK c/codes))
+              (let [length (p/read-object! bis)
+                    ba (make-byte-array length)]
+                (bsp/read-bytes! bis ba 0 length)
+                (.push chunks ba)
+                (recur (bsp/read! bis)))
+              (== code (.-BYTES c/codes))
+              (let [length (p/read-object! bis)
+                    ba (make-byte-array length)]
+                (bsp/read-bytes! bis ba 0 length)
+                (.push chunks ba))
+              :else
+              (throw (js/Error. (str "conclusion of chunked bytes (" code ")")))))
+          (let [length (reduce #(+ %1 (alength %2)) 0 (seq chunks))
+                ba (make-byte-array length)]
+            (loop [pos 0 chunk 0]
+              (when (< chunk (alength chunks))
+                (.set ba (aget chunks chunk) pos)
+                (recur (+ pos (alength (aget chunks chunk))) (inc chunk))))
+            ba))
         (== code (.-BOOLEAN-ARRAY c/codes))
         (.handle-struct bis "boolean[]" 2)
         (== code (.-INT-ARRAY c/codes))
@@ -535,43 +510,36 @@
         (== code (.-BEGIN_CLOSED_LIST c/codes))
         (let [oa #js []]
           (loop []
-            (if (== (.-END_COLLECTION c/codes) (.peek-read bis))
-              (do
-                (bsp/read! bis)
-                oa)
-              (do
-                (.push oa (p/read-object! bis))
-                (recur)))))
+            (when-not (== (.-END_COLLECTION c/codes) (.peek-read bis))
+              (.push oa (p/read-object! bis))
+              (recur)))
+          (bsp/read! bis)
+          oa)
         (== code (.-BEGIN_OPEN_LIST c/codes))
         (let [oa #js []]
           (loop [code (.peek-read bis)]
-            (if (or (== (.-END_COLLECTION c/codes) code) (nil? code))
-              (do
-                (bsp/read! bis)
-                oa)
-              (do
-                (.push oa (p/read-object! bis))
-                (recur (.peek-read bis))))))
+            (when-not (or (== (.-END_COLLECTION c/codes) code) (nil? code))
+              (.push oa (p/read-object! bis))
+              (recur (.peek-read bis))))
+          (bsp/read! bis)
+          oa)
         (<= 0xE4 code 0xEB)
         (let [oa #js []
               length (- code (.-LIST_PACKED_LENGTH_START c/codes))]
-          (do
-            (dotimes [i length]
-              (.push oa (p/read-object! bis)))
-            oa))
+          (dotimes [i length]
+            (.push oa (p/read-object! bis)))
+          oa)
         (== code (.-LIST c/codes))
         (let [oa #js []
               length (p/read-object! bis)]
-          (do
-            (dotimes [i length]
-              (.push oa (p/read-object! bis)))
-            oa))
+          (dotimes [i length]
+            (.push oa (p/read-object! bis)))
+          oa)
         (== code (.-STRUCTTYPE c/codes))
         (let [tag (p/read-object! bis)
               fields (p/read-int! bis)]
-          (do
-            (.push (.-struct-cache bis) (bs/struct-cache tag fields))
-            (.handle-struct bis tag fields)))
+          (.push (.-struct-cache bis) (bs/struct-cache tag fields))
+          (.handle-struct bis tag fields))
         (<= 0xA0 code 0xAF)
         (let [st (.lookup-cache bis (.-struct-cache bis) (- code (.-STRUCT_CACHE_PACKED_START c/codes)))]
           (.handle-struct bis (.-tag st) (.-fields st)))
@@ -591,11 +559,10 @@
         (== code (.-FOOTER c/codes))
         (let [calculated-length (dec (bsp/bytes-read bis))
               magic-from-stream (+ (bit-shift-right-zero-fill (bit-shift-left code 24) 0) (bsp/read-int24! bis))]
-          (do
-            (.validate-footer! bis calculated-length magic-from-stream)
-            (bsp/reset! bis)
-            (.clear-caches! bis)
-            (p/read-object! bis)))
+          (.validate-footer! bis calculated-length magic-from-stream)
+          (bsp/reset! bis)
+          (.clear-caches! bis)
+          (p/read-object! bis))
         (== code (.-FLOAT c/codes)) (bsp/read-float! bis)
         (== code (.-DOUBLE_0 c/codes)) 0.0
         (== code (.-DOUBLE_1 c/codes)) 1.0
@@ -603,7 +570,6 @@
   (validate-footer! [bis]
     (let [calculated-length (bsp/bytes-read bis)
           magic-from-stream (bsp/read-unsigned-int32! bis)]
-      (do
-        (.validate-footer! bis calculated-length magic-from-stream)
-        (bsp/reset! bis)
-        (.clear-caches! bis)))))
+      (.validate-footer! bis calculated-length magic-from-stream)
+      (bsp/reset! bis)
+      (.clear-caches! bis))))

@@ -66,55 +66,48 @@
   and values.  This method flattens the ClojureScript map sequence of key value
   pairs to a single list."
   (let [map-list (make-array (* 2 (count cljs-map)))]
-    (do
-      (write-tag writer "map" 1)
-      (loop [map-seq (seq cljs-map) i 0]
-        (if (empty? map-seq)
-          map-list
-          (let [[k v] (first map-seq)]
-            (do
-              (aset map-list i k)
-              (aset map-list (inc i) v)
-              (recur (rest map-seq) (+ i 2))))))
-      (write-list writer map-list))))
+    (write-tag writer "map" 1)
+    (loop [map-seq (seq cljs-map) i 0]
+      (if (empty? map-seq)
+        map-list
+        (let [[k v] (first map-seq)]
+          (aset map-list i k)
+          (aset map-list (inc i) v)
+          (recur (rest map-seq) (+ i 2)))))
+    (write-list writer map-list)))
 
 (def list-write-handler
   {"list"
    (fn [writer cljs-seq]
-     (do
-      (write-tag writer "list" 1)
-      (write-list writer cljs-seq)))})
+     (write-tag writer "list" 1)
+     (write-list writer cljs-seq))})
 
 (def vector-write-handler
   {"vector"
    (fn [writer cljs-seq]
-     (do
-      (write-tag writer "vector" 1)
-      (write-list writer cljs-seq)))})
+     (write-tag writer "vector" 1)
+     (write-list writer cljs-seq))})
 
 (def set-write-handler
   {"set"
    (fn [writer cljs-seq]
-     (do
-      (write-tag writer "set" 1)
-      (write-list writer cljs-seq)))})
+     (write-tag writer "set" 1)
+     (write-list writer cljs-seq))})
 ;;ClojureScript base writers
 (def clojure-write-handlers
   {Keyword
    {"key"
     (fn [writer k]
-      (do
-        (write-tag writer "key" 2)
-        (write-object writer (.-ns k) true)
-        (write-object writer (.-name k) true)))}
+      (write-tag writer "key" 2)
+      (write-object writer (.-ns k) true)
+      (write-object writer (.-name k) true))}
 
    Symbol
    {"sym"
     (fn [writer k]
-      (do
-        (write-tag writer "sym" 2)
-        (write-object writer (.-ns k) true)
-        (write-object writer (.-name k) true)))}
+      (write-tag writer "sym" 2)
+      (write-object writer (.-ns k) true)
+      (write-object writer (.-name k) true))}
 
    Range
    list-write-handler

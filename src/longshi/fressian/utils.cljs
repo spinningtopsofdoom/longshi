@@ -18,9 +18,8 @@
     end-pos (int) - The position to stop reading from the string"
     (loop [i 0 str-pos start-pos]
       (when (< str-pos end-pos)
-        (do
-          (aset code-pipe i (.charCodeAt s str-pos))
-          (recur (inc i) (inc str-pos))))))
+        (aset code-pipe i (.charCodeAt s str-pos))
+        (recur (inc i) (inc str-pos)))))
 
  (write-str-bytes [_ str-length buf-length]
    "Writes out character codes to bytes
@@ -56,9 +55,8 @@
      buffer ([byte]) - The buffer we are writing to"
     (let [str-length (Math/min 21846 (- total-str-length start))
           buf-length (Math/min 65536 (* 3 str-length))]
-      (do
-        (.string-to-codes sw s start (+ start str-length))
-        (.write-str-bytes sw str-length buf-length))))
+      (.string-to-codes sw s start (+ start str-length))
+      (.write-str-bytes sw str-length buf-length)))
 
   (get-buffer [_]
     "Gets the string buffer"
@@ -94,20 +92,18 @@
                 (recur (inc i) (inc pos)))
               (12 13)
               (let [ch1 (aget buffer (inc pos))]
-                (do
-                  (aset read-codes i
-                    (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
-                  (recur (inc i) (+ 2 pos))))
+                (aset read-codes i
+                      (bit-or (bit-and ch1 0x3f) (bit-shift-left (bit-and ch 0x1f) 6)))
+                (recur (inc i) (+ 2 pos)))
               14
               (let [ch1 (aget buffer (inc pos))
                     ch2 (aget buffer (+ 2 pos))]
-                (do
-                  (aset read-codes i
-                    (bit-or
-                      (bit-and ch2 0x3f)
-                      (bit-shift-left (bit-and ch1 0x3f) 6)
-                      (bit-shift-left (bit-and ch 0x0f) 12)))
-                  (recur (inc i) (+ 3 pos))))
+                (aset read-codes i
+                      (bit-or
+                        (bit-and ch2 0x3f)
+                        (bit-shift-left (bit-and ch1 0x3f) 6)
+                        (bit-shift-left (bit-and ch 0x0f) 12)))
+                (recur (inc i) (+ 3 pos)))
               (throw (js/Error. (str "Invalid UTF Character (" ch ")"))))))
         i)))
 
@@ -118,9 +114,8 @@
      chars-length (int) - The number of characters we are appending"
     (loop [i 0]
       (when (< i chars-length)
-        (do
-          (.append string-buffer (.fromCharCode js/String (aget read-codes i)))
-          (recur (inc i))))))
+        (.append string-buffer (.fromCharCode js/String (aget read-codes i)))
+        (recur (inc i)))))
 
   (get-buffer [_]
     "Gets the string buffer"
